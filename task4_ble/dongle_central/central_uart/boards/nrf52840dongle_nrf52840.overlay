@@ -1,0 +1,9 @@
+/*
+ * nRF52840 Dongle: NUS data goes to the USB CDC ACM virtual COM port.
+ * cdc_acm_uart is defined in the board devicetree.
+ */
+/ {
+	chosen {
+		nordic,nus-uart = &cdc_acm_uart;
+	};
+};
