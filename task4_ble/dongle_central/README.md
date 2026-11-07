@@ -14,8 +14,8 @@ Nordic `central_uart` 샘플(nRF Connect SDK v2.9.0)을 nRF52840 Dongle용으로
 NCS v2.9.0을 Toolchain Manager로 `C:\ncs`에 설치한 상태에서 Git Bash로 실행:
 
 ```
-cd /c/ncs/v2.9.0
-/c/Users/sujin/coding/projects/hw-bench/task4_ble/dongle_central/build.sh
+# hw-bench 루트에서 실행 (어느 폴더에서든 스크립트 경로만 맞으면 됨)
+task4_ble/dongle_central/build.sh
 ```
 
 결과: `central_uart/build/merged.hex` (복사본: `artifacts/central_uart_nrf52840dongle_ncs2.9.0.hex`, 주소 0x1000~0x3EB60, MBR와 부트로더 영역은 건드리지 않음).
