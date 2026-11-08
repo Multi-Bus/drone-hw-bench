@@ -7,7 +7,7 @@
 
 | 레벨 | 상태 | 비고 |
 | --- | --- | --- |
-| Lv1 동작 확인 | 진행 중 | 보드 2개 bring-up, 클럭, CYCCNT 검증 완료. 측정 공통 코드와 배치 사진이 남음 |
+| Lv1 동작 확인 | 진행 중 | 보드 2개 bring-up, 클럭, CYCCNT 검증, 배치 사진 완료. 측정 공통 코드가 남음 |
 | Lv2 성능 측정 | 시작 전 | |
 | Lv3 심화 | 시작 전 | Lv2 완료 후 |
 
@@ -29,7 +29,7 @@
 - [x] `SystemCoreClock` 출력: 600 MHz (보드 2개)
 - [x] CYCCNT 검증: `HAL_Delay(100)` 측정값이 클럭 × 0.1 s 근처 (보드 2개)
 - [ ] `measure/`에 공통 측정 코드 (시작·종료·통계·일괄 출력). 측정 중 UART 출력 금지, 배열에 저장 후 출력
-- [ ] 배치 사진 `photos/`
+- [x] 배치 사진 `photos/` (보드 1 전체·점퍼, 보드 2 전체)
 
 통과 기준 (PDF): 클럭 값 확인, CYCCNT 검증 (100 ms 측정값), 측정 코드가 repo에 올라감.
 
@@ -84,7 +84,17 @@ ST 예제 `UART_Printf`의 `main.c`에서 `USER CODE BEGIN 2`와 `USER CODE END 
 | `data/t3_clock.txt` | `SystemCoreClock` UART 출력 | ☑ |
 | `data/t3_cyccnt_100ms.csv` | CYCCNT 검증 (`HAL_Delay(100)`) | ☑ |
 | `measure/` | DWT 측정 공통 코드 | ☐ |
-| `photos/` | 보드 bring-up 사진 | ☐ |
+| `photos/` | 보드 bring-up 사진 | ☑ |
+
+## 사진
+
+개발 모드로 디버그가 연결된 상태의 보드. USB-C는 CN10(ST-LINK)에 연결.
+
+| 파일 | 내용 |
+| --- | --- |
+| [`photos/t3_board1_overview.jpg`](photos/t3_board1_overview.jpg) | 보드 1 전체. USB-C 연결, 전원·통신 LED 켜짐 |
+| [`photos/t3_board1_jumpers.jpg`](photos/t3_board1_jumpers.jpg) | 보드 1 점퍼 확대. JP1(BOOT0), JP2(BOOT1) 캡 위치 |
+| [`photos/t3_board2_overview.jpg`](photos/t3_board2_overview.jpg) | 보드 2 전체. USB-C 연결, 전원·통신 LED 켜짐, 점퍼 위치 |
 
 ## 빌드·플래싱
 
