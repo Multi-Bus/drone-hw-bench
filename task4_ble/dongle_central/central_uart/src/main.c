@@ -598,6 +598,15 @@ int main(void)
 		return 0;
 	}
 
+	/* USB first, so the CDC ACM port enumerates even if BT init fails */
+	if (IS_ENABLED(CONFIG_USB_DEVICE_STACK)) {
+		err = usb_enable(NULL);
+		if (err && (err != -EALREADY)) {
+			LOG_ERR("Failed to enable USB (err %d)", err);
+			return 0;
+		}
+	}
+
 	err = bt_enable(NULL);
 	if (err) {
 		LOG_ERR("Bluetooth init failed (err %d)", err);

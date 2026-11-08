@@ -6,8 +6,9 @@ Nordic `central_uart` 샘플(nRF Connect SDK v2.9.0)을 nRF52840 Dongle용으로
 ## 원본에서 바꾼 것
 
 - `central_uart/boards/nrf52840dongle_nrf52840.overlay`: NUS 데이터 UART를 USB CDC ACM(`cdc_acm_uart`)으로 지정 (신규)
-- `central_uart/boards/nrf52840dongle_nrf52840.conf`: USB 스택과 `UART_ASYNC_ADAPTER` 켜기, 하드웨어 UART와 UART 콘솔 끄기 (신규)
-- `central_uart/src/main.c`: `peripheral_uart`와 같은 방식으로 `usb_enable()`, `uart_async_adapter` 추가 (CDC ACM이 비동기 UART API를 지원하지 않아서)
+- `central_uart/boards/nrf52840dongle_nrf52840.conf`: USB 스택과 `UART_ASYNC_ADAPTER` 켜기, 하드웨어 UART와 UART 콘솔 끄기, LFCLK를 내부 RC로 (신규)
+- `central_uart/prj.conf`: `CONFIG_BT_SETTINGS=n` (bonding 저장 끔. 켜져 있으면 USB가 열거되지 않음, [삽질기록](../../삽질기록.md) Task 4 참고). 보드 conf와 충돌하던 UART 콘솔 줄 제거
+- `central_uart/src/main.c`: `peripheral_uart`와 같은 방식으로 `usb_enable()`, `uart_async_adapter` 추가 (CDC ACM이 비동기 UART API를 지원하지 않아서). `usb_enable()`을 `bt_enable()` 앞으로 옮김 (BT 실패와 무관하게 USB 열거)
 
 ## 빌드
 
@@ -18,7 +19,9 @@ NCS v2.9.0을 Toolchain Manager로 `C:\ncs`에 설치한 상태에서 Git Bash�
 task4_ble/dongle_central/build.sh
 ```
 
-결과: `central_uart/build/merged.hex` (복사본: `artifacts/central_uart_nrf52840dongle_ncs2.9.0.hex`, 주소 0x1000~0x3EB60, MBR와 부트로더 영역은 건드리지 않음).
+결과: `central_uart/build_hwb/merged.hex` (복사본: `artifacts/central_uart_bt_settings_off.hex`).
+
+빌드 폴더가 깊으면 Windows 경로 길이 제한(260자)에 걸려 실패할 수 있음. 그때는 `build.sh`의 `-d` 경로를 `C:\hwb_xxx`처럼 짧게 바꿈.
 
 ## 동글에 올리기
 
@@ -29,3 +32,9 @@ task4_ble/dongle_central/build.sh
 ## 사용
 
 동글을 꽂으면 가상 COM이 생긴다. 터미널로 열면 XIAO가 보내는 `<seq>,<millis>` 줄이 그대로 나온다. 에코 입력은 반대로 XIAO로 간다.
+
+## 확인 결과 (Task 4 Lv1)
+
+- 동글 COM 포트 `VID_2FE3&PID_0100`, XIAO1 연결 후 `seq,millis` 줄 수신 (약 100 ms 간격).
+- 15초 수신 로그: [`../data/t4_lv1_dongle_rx_15s.csv`](../data/t4_lv1_dongle_rx_15s.csv) (148행, seq 끊김 0, 간격 50–150 ms).
+- 확인 안 됨: RC(`K32SRC_RC`) 사용 조건에서 BLE 장시간 안정성, 연결 끊김 후 재연결 시간.
