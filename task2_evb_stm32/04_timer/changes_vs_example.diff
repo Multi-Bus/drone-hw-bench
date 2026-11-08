@@ -1,0 +1,217 @@
+--- a/main.c
++++ b/main.c
+@@ -23,6 +23,7 @@
+ 
+ /* Private includes ----------------------------------------------------------*/
+ /* USER CODE BEGIN Includes */
++#include <stdio.h>
+ 
+ /* USER CODE END Includes */
+ 
+@@ -46,6 +47,10 @@
+ TIM_HandleTypeDef htim2;
+ 
+ /* USER CODE BEGIN PV */
++UART_HandleTypeDef huart1;           /* USART1 -> ST-LINK virtual COM port (same as UART_Printf example) */
++volatile uint32_t tick_count;        /* 1 kHz ticks, incremented in the TIM2 interrupt */
++volatile uint32_t second_flag;       /* set in the interrupt every 1000 ticks (= 1 s) */
++volatile uint32_t cyccnt_at_second;  /* DWT CYCCNT captured in the interrupt at that tick */
+ 
+ /* USER CODE END PV */
+ 
+@@ -53,6 +58,7 @@
+ void SystemClock_Config(void);
+ void PeriphCommonClock_Config(void);
+ static void MX_TIM2_Init(void);
++static void MX_USART1_UART_Init(void);
+ /* USER CODE BEGIN PFP */
+ 
+ /* USER CODE END PFP */
+@@ -114,6 +120,14 @@
+   /* Initialize all configured peripherals */
+   MX_TIM2_Init();
+   /* USER CODE BEGIN 2 */
++  MX_USART1_UART_Init();
++
++  /* DWT cycle counter: used to measure the real period of the 1 s print */
++  DCB->DEMCR |= DCB_DEMCR_TRCENA_Msk;
++  DWT->CYCCNT = 0;
++  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
++
++  printf("\n\r TIM2 1 kHz tick, one UART line per second\n\r");
+ 
+   /*## Start the TIM Base generation in interrupt mode ####################*/
+   /* Start Channel1 */
+@@ -123,6 +137,8 @@
+     Error_Handler();
+   }
+ 
++  uint32_t cyccnt_prev = DWT->CYCCNT;
++  uint32_t seconds = 0;
+   /* USER CODE END 2 */
+ 
+   /* Infinite loop */
+@@ -132,6 +148,17 @@
+     /* USER CODE END WHILE */
+ 
+     /* USER CODE BEGIN 3 */
++    if (second_flag)
++    {
++      second_flag = 0;
++      uint32_t now = cyccnt_at_second;
++      seconds++;
++      /* printf only here in the main loop, never inside the interrupt */
++      printf("t=%lu s, ticks=%lu, CYCCNT delta=%lu\n\r", (unsigned long)seconds,
++             (unsigned long)tick_count, (unsigned long)(now - cyccnt_prev));
++      cyccnt_prev = now;
++      BSP_LED_Toggle(LED1);
++    }
+ 
+   }
+   /* USER CODE END 3 */
+@@ -304,6 +331,45 @@
+ }
+ 
+ /* USER CODE BEGIN 4 */
++/* printf -> USART1 (newlib calls __io_putchar through syscalls.c) */
++int __io_putchar(int ch)
++{
++  HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, 0xFFFF);
++  return ch;
++}
++
++/* USART1 init copied from the UART_Printf example: 115200, 8 bits incl. odd parity, 1 stop bit */
++static void MX_USART1_UART_Init(void)
++{
++  huart1.Instance = USART1;
++  huart1.Init.BaudRate = 115200;
++  huart1.Init.WordLength = UART_WORDLENGTH_8B;
++  huart1.Init.StopBits = UART_STOPBITS_1;
++  huart1.Init.Parity = UART_PARITY_ODD;
++  huart1.Init.Mode = UART_MODE_TX_RX;
++  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
++  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
++  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
++  huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
++  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
++  if (HAL_UART_Init(&huart1) != HAL_OK)
++  {
++    Error_Handler();
++  }
++  if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
++  {
++    Error_Handler();
++  }
++  if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
++  {
++    Error_Handler();
++  }
++  if (HAL_UARTEx_DisableFifoMode(&huart1) != HAL_OK)
++  {
++    Error_Handler();
++  }
++}
++
+ /**
+   * @brief  Period elapsed callback in non blocking mode
+   * @param  htim : TIM handle
+@@ -311,7 +377,13 @@
+   */
+ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+ {
+-  BSP_LED_Toggle(LED1);
++  /* runs every 1 ms: only count, no printf here */
++  tick_count++;
++  if ((tick_count % 1000U) == 0U)
++  {
++    cyccnt_at_second = DWT->CYCCNT;
++    second_flag = 1;
++  }
+ }
+ /* USER CODE END 4 */
+ 
+--- a/stm32n6xx_hal_msp.c
++++ b/stm32n6xx_hal_msp.c
+@@ -126,5 +126,41 @@
+ }
+ 
+ /* USER CODE BEGIN 1 */
++/* UART MSP: copied from the UART_Printf example (USART1 on PE5 = TX, PE6 = RX) */
++void HAL_UART_MspInit(UART_HandleTypeDef* huart)
++{
++  GPIO_InitTypeDef GPIO_InitStruct = {0};
++  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
++  if(huart->Instance==USART1)
++  {
++    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USART1;
++    PeriphClkInitStruct.Usart1ClockSelection = RCC_USART1CLKSOURCE_PCLK2;
++    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
++    {
++      Error_Handler();
++    }
++
++    __HAL_RCC_USART1_CLK_ENABLE();
++    __HAL_RCC_GPIOE_CLK_ENABLE();
++    GPIO_InitStruct.Pin = GPIO_PIN_5|GPIO_PIN_6;
++    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
++    GPIO_InitStruct.Pull = GPIO_PULLUP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
++    GPIO_InitStruct.Alternate = GPIO_AF7_USART1;
++    HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
++  }
++}
++
++void HAL_UART_MspDeInit(UART_HandleTypeDef* huart)
++{
++  if(huart->Instance==USART1)
++  {
++    __HAL_RCC_USART1_FORCE_RESET();
++    __HAL_RCC_USART1_RELEASE_RESET();
++    __HAL_RCC_USART1_CLK_DISABLE();
++    HAL_GPIO_DeInit(GPIOE, GPIO_PIN_5|GPIO_PIN_6);
++  }
++}
++
+ 
+ /* USER CODE END 1 */
+--- a/main.h
++++ b/main.h
+@@ -106,7 +106,7 @@
+        + Counter direction = Up
+   */
+ 
+-#define PERIOD_VALUE (10000 - 1);
++#define PERIOD_VALUE (10 - 1);   /* 10 kHz counter / 10 = 1 kHz (example default was 10000 - 1 = 1 Hz) */
+ 
+ /* USER CODE END Private defines */
+ 
+--- a/stm32n6xx_hal_conf.h
++++ b/stm32n6xx_hal_conf.h
+@@ -80,7 +80,7 @@
+ /*#define HAL_SPI_MODULE_ENABLED   */
+ /*#define HAL_SRAM_MODULE_ENABLED   */
+ #define HAL_TIM_MODULE_ENABLED
+-/*#define HAL_UART_MODULE_ENABLED   */
++#define HAL_UART_MODULE_ENABLED
+ /*#define HAL_USART_MODULE_ENABLED   */
+ /*#define HAL_WWDG_MODULE_ENABLED   */
+ /*#define HAL_XSPI_MODULE_ENABLED   */
+--- a/.project
++++ b/.project
+@@ -117,6 +117,16 @@
+ 			<locationURI>PARENT-7-PROJECT_LOC/Drivers/STM32N6xx_HAL_Driver/Src/stm32n6xx_hal_tim_ex.c</locationURI>
+ 		</link>
+ 		<link>
++			<name>Drivers/STM32N6xx_HAL_Driver/stm32n6xx_hal_uart.c</name>
++			<type>1</type>
++			<locationURI>PARENT-7-PROJECT_LOC/Drivers/STM32N6xx_HAL_Driver/Src/stm32n6xx_hal_uart.c</locationURI>
++		</link>
++		<link>
++			<name>Drivers/STM32N6xx_HAL_Driver/stm32n6xx_hal_uart_ex.c</name>
++			<type>1</type>
++			<locationURI>PARENT-7-PROJECT_LOC/Drivers/STM32N6xx_HAL_Driver/Src/stm32n6xx_hal_uart_ex.c</locationURI>
++		</link>
++		<link>
+ 			<name>Drivers/BSP/STM32N6xx_Nucleo/stm32n6xx_nucleo.c</name>
+ 			<type>1</type>
+ 			<locationURI>PARENT-7-PROJECT_LOC/Drivers/BSP/STM32N6xx_Nucleo/stm32n6xx_nucleo.c</locationURI>
