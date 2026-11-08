@@ -7,7 +7,7 @@
 
 | 레벨 | 상태 | 비고 |
 | --- | --- | --- |
-| Lv1 동작 확인 | 진행 중 | 보드 2개 bring-up, 클럭, CYCCNT 검증, 배치 사진 완료. 측정 공통 코드가 남음 |
+| Lv1 동작 확인 | 완료 | 보드 2개 bring-up, 클럭, CYCCNT 검증, 배치 사진 완료. 측정 공통 코드(`measure/`)는 컴파일만 확인했고 보드에서는 시험 전 |
 | Lv2 성능 측정 | 시작 전 | |
 | Lv3 심화 | 시작 전 | Lv2 완료 후 |
 
@@ -28,7 +28,7 @@
 - [x] ST 예제 `UART_Printf`로 UART 출력 (보드 2개)
 - [x] `SystemCoreClock` 출력: 600 MHz (보드 2개)
 - [x] CYCCNT 검증: `HAL_Delay(100)` 측정값이 클럭 × 0.1 s 근처 (보드 2개)
-- [ ] `measure/`에 공통 측정 코드 (시작·종료·통계·일괄 출력). 측정 중 UART 출력 금지, 배열에 저장 후 출력
+- [x] `measure/`에 공통 측정 코드 (시작·종료·통계·일괄 출력). 측정 중 UART 출력 금지, 배열에 저장 후 출력 (컴파일만 확인, 보드 시험 전)
 - [x] 배치 사진 `photos/` (보드 1 전체·점퍼, 보드 2 전체)
 
 통과 기준 (PDF): 클럭 값 확인, CYCCNT 검증 (100 ms 측정값), 측정 코드가 repo에 올라감.
@@ -77,13 +77,47 @@ ST 예제 `UART_Printf`의 `main.c`에서 `USER CODE BEGIN 2`와 `USER CODE END 
 - 결과는 평균 / 최소 / 최대. 실시간 판단은 최대값 기준.
 - 측정 중에는 UART 출력 금지. 배열에 저장했다가 끝난 뒤 한 번에 출력한다.
 
+## 측정 공통 코드 (`measure/`)
+
+`bench.h`, `bench.c`. Task 3 Lv2 벤치마크와 Task 2 Lv2의 레인징 시간 측정이 같이 쓴다.
+
+```c
+bench_init();                          // 처음 한 번: DWT CYCCNT 켜기
+bench_reset();                         // 조건마다: 저장된 샘플 비우기
+for (i = 0; i < BENCH_MAX_SAMPLES; i++) {
+  bench_start();
+  /* 측정할 코드 */
+  bench_stop();                        // 사이클 차이를 배열에 저장 (출력하지 않음)
+}
+bench_report("matmul_4x4_O2");         // 끝난 뒤 한 번에: n, 평균·최소·최대 (cycle, µs)
+bench_dump();                          // 선택: raw 샘플을 index,cycles CSV로 출력
+```
+
+| 함수 | 하는 일 |
+| --- | --- |
+| `bench_init()` | DWT 사이클 카운터를 켠다 (`DCB->DEMCR`의 TRCENA, `DWT->CTRL`의 CYCCNTENA) |
+| `bench_reset()` | 저장된 샘플 개수를 0으로 되돌린다 |
+| `bench_start()` | 지금의 CYCCNT를 기억한다 |
+| `bench_stop()` | `CYCCNT - 기억한 값`을 샘플 하나로 저장한다 |
+| `bench_record(c)` | 다른 곳에서 구한 값을 샘플로 저장한다 (예: 타이머 ISR의 주기 jitter 측정에서 연속 CYCCNT 차이) |
+| `bench_report(name)` | 샘플 개수, 평균·최소·최대를 cycle과 µs(소수 셋째 자리)로 출력한다. 실시간 판단은 최대값 기준 |
+| `bench_dump()` | 샘플을 `index,cycles` 줄로 출력한다. 조건별 raw CSV로 저장할 때 쓴다 |
+
+- 최대 10,000개(`BENCH_MAX_SAMPLES`, 과제 PDF의 반복 횟수)까지 저장하고 넘치는 샘플은 버린다. 리포트의 `n`으로 확인한다. 샘플 배열은 약 40 KB(RAM)이다.
+- 측정에는 `bench_start()`와 `bench_stop()` 호출 자체의 사이클이 들어간다. 아주 짧은 코드는 빈 구간을 같은 방법으로 먼저 재서 비교해야 한다.
+- 한 번의 측정이 7.16 s(600 MHz에서 32비트 카운터 한 바퀴)를 넘으면 안 된다.
+- 평균은 정수 사이클로 내림한다. 합은 64비트로 계산해서 10,000개를 더해도 넘치지 않는다.
+- `printf`로 출력하므로 프로젝트에 `printf`가 UART로 연결돼 있어야 한다 (ST 예제 `UART_Printf` 방식).
+
+**시험 상태:** ARM 컴파일러(`arm-none-eabi-gcc` 14.3.1, CubeIDE 2.2.0 포함, `-mcpu=cortex-m55 -Wall -Wextra`)로 컴파일만 확인했다. 경고 0개, 코드 약 0.5 KB, 샘플 배열 40,008 B. 링크와 보드 실행은 하지 않았다. Lv2의 첫 벤치마크에서 처음 동작이 확인된다.
+
 ## Lv1 데이터
 
 | 파일 | 내용 | 상태 |
 | --- | --- | --- |
 | `data/t3_clock.txt` | `SystemCoreClock` UART 출력 | ☑ |
 | `data/t3_cyccnt_100ms.csv` | CYCCNT 검증 (`HAL_Delay(100)`) | ☑ |
-| `measure/` | DWT 측정 공통 코드 | ☐ |
+| `measure/bench.h`, `measure/bench.c` | DWT 측정 공통 코드 (컴파일만 확인) | ☑ |
 | `photos/` | 보드 bring-up 사진 | ☑ |
 
 ## 사진
