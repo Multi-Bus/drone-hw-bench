@@ -1,0 +1,4 @@
+# NUCLEO-N657X0-Q, ST 예제 UART_Printf (STM32CubeN6 1.4.1) + SystemCoreClockUpdate() 후 출력
+# 2026-11-09, Tera Term 화면에서 옮겨 적음 (로그 파일 아님)
+board1 (COM5): SystemCoreClock = 600000000 Hz
+board2 (COM6): SystemCoreClock = 600000000 Hz
