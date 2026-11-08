@@ -13,7 +13,7 @@
 
 ## 보드
 
-- 사용 보드: NUCLEO-N657X0-Q (Task 3과 같은 보드). 일반 STM32 보드 없음. 보드 번호·가상 COM 번호: (직접 기재)
+- 사용 보드: NUCLEO-N657X0-Q (Task 3과 같은 보드). 일반 STM32 보드 없음. Lv1은 **보드 2 (가상 COM6)** 에서 했다. 보드 1은 Task 2 Lv1을 하지 않았다 (Task 3 Lv1은 두 보드 모두 확인).
 - 점퍼: JP1 = BOOT0, JP2 = BOOT1. 개발 모드는 BOOT1 = 1 (ST 예제 README 기준 JP2 2-3, BOOT0는 상관없음). 자세한 내용은 `../task3_n6/README.md`.
 - 개발 모드에서 올린 프로그램은 RAM에서 돈다. **RESET 버튼을 누르면 프로그램이 사라져서** 아무것도 실행되지 않는다. 다시 보려면 디버그를 Terminate하고 Debug를 새로 시작한다.
 - 콘솔: USART1 (PE5 TX, PE6 RX), 115200, ST-LINK 가상 COM. 설정은 `8 Bits (including Parity)` + `Odd` + 1 stop, 즉 데이터 7 bit + 홀수 패리티다 (`UART_Printf.ioc` 캡처 `docs/t2_lv1_uart.png`). Tera Term은 7 bit / odd / 1 / none으로 맞춘다. 초안의 `8N1`이 아니다.
@@ -163,7 +163,7 @@ if (second_flag)
 
 ## 확인 필요
 
-- 사용한 보드 번호와 COM 번호 기재.
+- 보드 1에서 EXTI와 `04_timer`를 돌려 보지 않았다. 보드 2와 같은 모델이고 보드 1도 Task 3 Lv1(LED, UART, 600 MHz 클럭, CYCCNT)은 정상이었지만, 버튼과 타이머는 보드 1에서 확인하지 않았다. Task 2 Lv2에서 보드 1이 필요해질 때 `04_timer`로 확인할 예정.
 - EXTI가 버튼을 **누르는 순간**에 반응하는지 **떼는 순간**에 반응하는지 확인하지 않았다. 초안은 B1을 active high로 적었는데, 그렇다면 falling edge는 뗄 때 반응할 수 있다. 예제 README는 누를 때 토글된다고 적었다.
 - LED 이름 (초안의 LD5/LD6/LD7 표기와 보드 인쇄 LED1~LED3), active low 여부는 UM3417과 대조하지 못했다.
 - EXTI 동작은 육안 확인이고 파일 기록이 없다.
