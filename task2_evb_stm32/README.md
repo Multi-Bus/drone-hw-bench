@@ -13,7 +13,7 @@
 
 ## 보드
 
-- 사용 보드: NUCLEO-N657X0-Q (Task 3과 같은 보드). 일반 STM32 보드 없음. Lv1은 **보드 2 (가상 COM6)** 에서 했다. 보드 1은 Task 2 Lv1을 하지 않았다 (Task 3 Lv1은 두 보드 모두 확인).
+- 사용 보드: NUCLEO-N657X0-Q (Task 3과 같은 보드). 일반 STM32 보드 없음. Lv1은 **보드 2 (가상 COM6)** 에서 먼저 하고, 이어서 **보드 1 (가상 COM5)** 에서 EXTI와 `04_timer`를 같은 방법으로 확인했다.
 - 점퍼: JP1 = BOOT0, JP2 = BOOT1. 개발 모드는 BOOT1 = 1 (ST 예제 README 기준 JP2 2-3, BOOT0는 상관없음). 자세한 내용은 `../task3_n6/README.md`.
 - 개발 모드에서 올린 프로그램은 RAM에서 돈다. **RESET 버튼을 누르면 프로그램이 사라져서** 아무것도 실행되지 않는다. 다시 보려면 디버그를 Terminate하고 Debug를 새로 시작한다.
 - 콘솔: USART1 (PE5 TX, PE6 RX), 115200, ST-LINK 가상 COM. 설정은 `8 Bits (including Parity)` + `Odd` + 1 stop, 즉 데이터 7 bit + 홀수 패리티다 (`UART_Printf.ioc` 캡처 `docs/t2_lv1_uart.png`). Tera Term은 7 bit / odd / 1 / none으로 맞춘다. 초안의 `8N1`이 아니다.
@@ -25,8 +25,8 @@
 - [x] STM32CubeIDE 설치, 보드 인식 확인 (Task 3 Lv1에서 완료)
 - [x] GPIO LED 깜빡임: ST 예제 `GPIO_IOToggle`, LED1 (Task 3 Lv1에서 완료, 보드 2개)
 - [x] UART `printf` 출력: ST 예제 `UART_Printf` (Task 3 Lv1)와 `04_timer`의 1초 출력
-- [x] 버튼 EXTI로 LED 토글: ST 예제 `GPIO_EXTI`, 버튼을 누르면 LED1이 바뀜 (육안 확인, 파일 기록 없음)
-- [x] `04_timer/`: 1 kHz 타이머 인터럽트, 1초마다 UART 출력, 인터럽트 안에서 printf 안 씀. 로그 `data/t2_tim_1khz_log.txt`
+- [x] 버튼 EXTI로 LED 토글: ST 예제 `GPIO_EXTI`, 버튼 조작으로 LED1이 바뀜. 보드 2와 보드 1에서 확인했고 버튼을 **뗄 때** 바뀐다 (육안 확인, 파일 기록 없음)
+- [x] `04_timer/`: 1 kHz 타이머 인터럽트, 1초마다 UART 출력, 인터럽트 안에서 printf 안 씀. 로그 `data/t2_tim_1khz_log_board2.txt`, `data/t2_tim_1khz_log_board1.txt` (보드 2개)
 - [x] 단계별 CubeMX 설정 화면 캡처 → `docs/` (LED, UART, TIM2). EXTI는 `.ioc`에 설정이 없어 코드로 대체
 
 통과 기준 (PDF): LED, UART, EXTI, 1 kHz 타이머 4가지 동작과 설정 캡처가 README에 있음.
@@ -72,6 +72,8 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin)
 
 - 인터럽트가 falling edge에서 발생하고, 콜백은 LED1을 토글한다.
 - 초안의 "Rising edge, 50 ms 디바운스"는 PDF에 없는 조건이다 (PDF: 버튼 누르면 LED 토글). 예제는 falling edge이고 디바운스를 구현하지 않았다.
+- **LED1은 버튼을 누를 때가 아니라 뗄 때 바뀐다** (보드 1에서 버튼을 누른 채 유지하며 확인). 예제 README는 "누를 때 토글"이라고 적었지만 이 보드에서는 다르다. 초안대로 B1이 active high(누르면 High)이고 예제가 falling edge로 설정돼 있으니 뗄 때 falling edge가 생긴다는 것과 앞뒤가 맞다. 버튼 회로는 UM3417과 대조하지 않았다.
+- 누를 때 반응하게 하려면 `GPIO_MODE_IT_RISING`과 `HAL_GPIO_EXTI_Rising_Callback`으로 바꾸면 되지만, 이 repo에서는 바꾸지 않았다 (PDF 조건은 "버튼 누르면 LED 토글"이라서 필요하면 Lv2 전에 정리).
 
 ### 1 kHz 타이머 + UART (`04_timer/`)
 
@@ -115,13 +117,16 @@ if (second_flag)
 
 ## 결과
 
-측정 날짜: 2026-11-09. `data/t2_tim_1khz_log.txt`는 Tera Term 로그 파일이다 (옮겨 적은 값이 아님).
+측정 날짜: 2026-11-09. `data/t2_tim_1khz_log_board*.txt`는 Tera Term 로그 파일이다 (옮겨 적은 값이 아님). 두 보드에 같은 `04_timer` 코드를 올렸다.
 
-| 항목 | 값 |
-| --- | --- |
-| 로그 줄 수 | 28 (`t = 378 ~ 405 s`, 프로그램을 시작하고 약 6분 뒤에 로그를 켬) |
-| `CYCCNT delta` | 28줄 모두 600000000 (= 600 MHz × 1 s) |
-| `ticks` | 모든 줄에서 `t × 1000`과 일치 (405초 동안 인터럽트를 놓치지 않음) |
+| 항목 | 보드 2 (COM6) | 보드 1 (COM5) |
+| --- | --- | --- |
+| 로그 파일 | `data/t2_tim_1khz_log_board2.txt` | `data/t2_tim_1khz_log_board1.txt` |
+| 로그 줄 수 | 28 (`t = 378 ~ 405 s`) | 23 (`t = 35 ~ 57 s`) |
+| `CYCCNT delta` | 28줄 모두 600000000 (= 600 MHz × 1 s) | 23줄 모두 600000000 |
+| `ticks` | 모든 줄에서 `t × 1000`과 일치 | 모든 줄에서 `t × 1000`과 일치 |
+
+로그는 프로그램을 시작하고 한참 뒤에 켜서 `t`가 1부터 시작하지 않는다. 보드 2는 약 6분, 보드 1은 약 35초 뒤다. 보드 2는 405초 동안, 보드 1은 57초 동안 인터럽트를 놓치지 않았다 (`ticks`가 `t × 1000`과 일치하는 것 기준, 로그에 찍힌 구간만 확인).
 
 해석과 한계:
 
@@ -148,7 +153,8 @@ if (second_flag)
 | --- | --- | --- |
 | `04_timer/src/` | 수정한 파일 4개 | 완료 |
 | `04_timer/changes_vs_example.diff` | 원본 예제와의 차이 (`.project` 포함) | 완료 |
-| `data/t2_tim_1khz_log.txt` | 1 kHz 타이머 UART 로그 28줄 | 완료 |
+| `data/t2_tim_1khz_log_board2.txt` | 보드 2의 1 kHz 타이머 UART 로그 28줄 | 완료 |
+| `data/t2_tim_1khz_log_board1.txt` | 보드 1의 같은 로그 23줄 | 완료 |
 | `docs/` | CubeMX 캡처 5장 (EXTI는 해당 없음) | 완료 |
 | 보드 배치 사진 | 배선·보드 사진 | Task 3 사진 참조 (`../task3_n6/photos/`, 별도 브랜치) |
 
@@ -163,8 +169,7 @@ if (second_flag)
 
 ## 확인 필요
 
-- 보드 1에서 EXTI와 `04_timer`를 돌려 보지 않았다. 보드 2와 같은 모델이고 보드 1도 Task 3 Lv1(LED, UART, 600 MHz 클럭, CYCCNT)은 정상이었지만, 버튼과 타이머는 보드 1에서 확인하지 않았다. Task 2 Lv2에서 보드 1이 필요해질 때 `04_timer`로 확인할 예정.
-- EXTI가 버튼을 **누르는 순간**에 반응하는지 **떼는 순간**에 반응하는지 확인하지 않았다. 초안은 B1을 active high로 적었는데, 그렇다면 falling edge는 뗄 때 반응할 수 있다. 예제 README는 누를 때 토글된다고 적었다.
+- 뗄 때 반응하는 것은 보드 1에서만 확인했다. 보드 2는 버튼을 눌러 LED가 바뀌는 것만 봤고 누를 때인지 뗄 때인지는 보지 않았다.
 - LED 이름 (초안의 LD5/LD6/LD7 표기와 보드 인쇄 LED1~LED3), active low 여부는 UM3417과 대조하지 못했다.
 - EXTI 동작은 육안 확인이고 파일 기록이 없다.
 - DWM3000EVB와 N6 보드 헤더의 핀 호환 (Lv2 배선)은 조사하지 않았다.
