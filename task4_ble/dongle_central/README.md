@@ -8,6 +8,8 @@ Nordic `central_uart` 샘플(nRF Connect SDK v2.9.0)을 nRF52840 Dongle용으로
 - `central_uart/boards/nrf52840dongle_nrf52840.overlay`: NUS 데이터 UART를 USB CDC ACM(`cdc_acm_uart`)으로 지정 (신규)
 - `central_uart/boards/nrf52840dongle_nrf52840.conf`: USB 스택과 `UART_ASYNC_ADAPTER` 켜기, 하드웨어 UART와 UART 콘솔 끄기, LFCLK를 내부 RC로 (신규)
 - `central_uart/prj.conf`: `CONFIG_BT_SETTINGS=n` (bonding 저장 끔. 켜져 있으면 USB가 열거되지 않음, [삽질기록](../../삽질기록.md) Task 4 참고). 보드 conf와 충돌하던 UART 콘솔 줄 제거
+- `central_uart/prj.conf` (Lv2 처리량용): `CONFIG_HEAP_MEM_POOL_SIZE` 2048 → 16384, `BT_L2CAP_TX_MTU=247`, `BT_BUF_ACL_RX_SIZE=251`, `BT_BUF_ACL_TX_SIZE=251`, `BT_CTLR_DATA_LENGTH_MAX=251`. 이전에는 MTU 65에 묶였고 최대 속도 송신에서 손실이 22–75%였다
+- `central_uart/src/main.c`: `UART_BUF_SIZE` 20 → 64 (244 B 알림을 13조각 대신 4조각으로 USB 시리얼에 전달)
 - `central_uart/src/main.c`: `peripheral_uart`와 같은 방식으로 `usb_enable()`, `uart_async_adapter` 추가 (CDC ACM이 비동기 UART API를 지원하지 않아서). `usb_enable()`을 `bt_enable()` 앞으로 옮김 (BT 실패와 무관하게 USB 열거)
 
 ## 빌드
@@ -19,7 +21,7 @@ NCS v2.9.0을 Toolchain Manager로 `C:\ncs`에 설치한 상태에서 Git Bash�
 task4_ble/dongle_central/build.sh
 ```
 
-결과: `central_uart/build_hwb/merged.hex` (복사본: `artifacts/central_uart_bt_settings_off.hex`).
+결과: `central_uart/build_hwb/merged.hex` (복사본: `artifacts/central_uart_mtu247.hex`).
 
 빌드 폴더가 깊으면 Windows 경로 길이 제한(260자)에 걸려 실패할 수 있음. 그때는 `build.sh`의 `-d` 경로를 `C:\hwb_xxx`처럼 짧게 바꿈.
 

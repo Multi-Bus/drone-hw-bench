@@ -38,7 +38,7 @@
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 /* UART payload buffer element size. */
-#define UART_BUF_SIZE 20
+#define UART_BUF_SIZE 64	/* was 20: a 244 B notification needs 4 buffers instead of 13 */
 
 #define KEY_PASSKEY_ACCEPT DK_BTN1_MSK
 #define KEY_PASSKEY_REJECT DK_BTN2_MSK
