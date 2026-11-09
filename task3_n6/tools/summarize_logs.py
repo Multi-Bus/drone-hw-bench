@@ -129,8 +129,22 @@ def main():
     print("| --- | ---: | ---: | ---: | ---: | ---: |")
     for k, r in isr.items():
         if k.startswith(("ISR period", "period dev", "ISR exec", "interrupt lat")):
-            print("| {} | {:,} | {:,} | {:,} | {} | #{} |".format(k.replace("|", "\|"), r["mean_cycles"], r["min_cycles"], r["max_cycles"],
+            print("| {} | {:,} | {:,} | {:,} | {} | #{} |".format(k.replace("|", "\\|"), r["mean_cycles"], r["min_cycles"], r["max_cycles"],
                                                               r["max_us"], r.get("max_at_sample", "?")))
+
+    # ---- board 2 vs board 1, same build (isr logs)
+    b2 = isr
+    b1 = {r["benchmark"]: r for r in by_file.get("t3_lv2_isr_O3_cacheon_board1.txt", [])}
+    if b1:
+        print("\n**보드 2 vs 보드 1 (같은 빌드, -O3, 캐시 켬, `isr` 로그, 사이클)**\n")
+        print("| 항목 | 보드 2 평균 | 보드 1 평균 | 보드 2 최대 | 보드 1 최대 |")
+        print("| --- | ---: | ---: | ---: | ---: |")
+        for k, r in b2.items():
+            q = b1.get(k)
+            if q:
+                print("| {} | {:,} | {:,} | {:,} | {:,} |".format(k.replace("|", "\\|"), r["mean_cycles"], q["mean_cycles"],
+                                                                 r["max_cycles"], q["max_cycles"]))
+
     for n, d in diffs.items():
         print("\n%s: max |plain C - CMSIS-DSP| = %d e-6" % (n, d))
 

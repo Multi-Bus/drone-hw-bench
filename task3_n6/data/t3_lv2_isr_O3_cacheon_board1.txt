@@ -1,0 +1,97 @@
+
+ T3 bench step 2, clock = 600000000 Hz
+
+== T3 Lv2 benchmarks, optimized build (level: see project settings) ==
+I-cache on, D-cache on
+matmul 4x4 f32: n=10000, clock=600000000 Hz
+  mean        261 cycles  0.435 us
+  min         260 cycles  0.433 us
+  max         950 cycles  1.583 us
+  max at sample #0
+  samples > min+100 cycles: 1 of 10000
+matmul 4x4 f32 (CMSIS-DSP): n=10000, clock=600000000 Hz
+  mean        142 cycles  0.236 us
+  min         141 cycles  0.235 us
+  max         747 cycles  1.245 us
+  max at sample #0
+  samples > min+100 cycles: 1 of 10000
+matmul 12x12 f32: n=10000, clock=600000000 Hz
+  mean       2846 cycles  4.743 us
+  min        2846 cycles  4.743 us
+  max        4769 cycles  7.948 us
+  max at sample #0
+  samples > min+100 cycles: 1 of 10000
+matmul 12x12 f32 (CMSIS-DSP): n=10000, clock=600000000 Hz
+  mean       2471 cycles  4.118 us
+  min        2466 cycles  4.110 us
+  max        3838 cycles  6.396 us
+  max at sample #0
+  samples > min+100 cycles: 1 of 10000
+  max |plain C - CMSIS-DSP| = 0 e-6
+PID 3-axis, 1 update: n=10000, clock=600000000 Hz
+  mean        139 cycles  0.231 us
+  min         139 cycles  0.231 us
+  max         781 cycles  1.301 us
+  max at sample #0
+  samples > min+100 cycles: 1 of 10000
+sinf: n=10000, clock=600000000 Hz
+  mean        171 cycles  0.285 us
+  min         171 cycles  0.285 us
+  max         414 cycles  0.690 us
+  max at sample #0
+  samples > min+100 cycles: 1 of 10000
+cosf: n=10000, clock=600000000 Hz
+  mean        191 cycles  0.318 us
+  min         191 cycles  0.318 us
+  max         408 cycles  0.680 us
+  max at sample #0
+  samples > min+100 cycles: 1 of 10000
+sqrtf: n=10000, clock=600000000 Hz
+  mean         31 cycles  0.051 us
+  min          31 cycles  0.051 us
+  max          65 cycles  0.108 us
+  max at sample #2964
+  samples > min+100 cycles: 0 of 10000
+atan2f: n=10000, clock=600000000 Hz
+  mean        298 cycles  0.496 us
+  min         296 cycles  0.493 us
+  max        1101 cycles  1.835 us
+  max at sample #0
+  samples > min+100 cycles: 1 of 10000
+attitude step (quat integrate + normalize): n=10000, clock=600000000 Hz
+  mean         98 cycles  0.163 us
+  min          98 cycles  0.163 us
+  max         357 cycles  0.595 us
+  max at sample #0
+  samples > min+100 cycles: 2 of 10000
+checksum = 8512
+== done ==
+
+== T3 Lv2 1 kHz interrupt test (PID + 12x12 matmul in the ISR), 10000 periods ==
+I-cache on, D-cache on
+ISR period (target 600000 cycles = 1 ms): n=10000, clock=600000000 Hz
+  mean     599999 cycles  999.998 us
+  min      599894 cycles  999.823 us
+  max      600035 cycles  1000.058 us
+  max at sample #877
+  samples > min+100 cycles: 9987 of 10000
+period deviation |period - 600000| (jitter): n=10000, clock=600000000 Hz
+  mean          0 cycles  0.000 us
+  min           0 cycles  0.000 us
+  max         106 cycles  0.176 us
+  max at sample #0
+  samples > min+100 cycles: 1 of 10000
+ISR execution time (PID + 12x12 matmul): n=10000, clock=600000000 Hz
+  mean       3044 cycles  5.073 us
+  min        3036 cycles  5.060 us
+  max        3120 cycles  5.200 us
+  max at sample #5461
+  samples > min+100 cycles: 0 of 10000
+interrupt latency (CNT at handler start, in CPU cycles): n=10000, clock=600000000 Hz
+  mean         43 cycles  0.071 us
+  min          43 cycles  0.071 us
+  max          79 cycles  0.131 us
+  max at sample #877
+  samples > min+100 cycles: 0 of 10000
+control loop CPU share (max exec / 1 ms) = 0.52 %
+== interrupt test done ==

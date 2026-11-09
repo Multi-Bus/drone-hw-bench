@@ -33,6 +33,20 @@ t3_lv2_bench_O3_cacheon_board2.txt,bench,O3,cacheon,2,cosf,10000,600000000,191,0
 t3_lv2_bench_O3_cacheon_board2.txt,bench,O3,cacheon,2,sqrtf,10000,600000000,31,0.051,31,0.051,128,0.213,5112,0
 t3_lv2_bench_O3_cacheon_board2.txt,bench,O3,cacheon,2,atan2f,10000,600000000,196,0.326,195,0.325,997,1.661,0,1
 t3_lv2_bench_O3_cacheon_board2.txt,bench,O3,cacheon,2,attitude step (quat integrate + normalize),10000,600000000,98,0.163,98,0.163,411,0.685,0,1
+t3_lv2_isr_O3_cacheon_board1.txt,isr,O3,cacheon,1,matmul 4x4 f32,10000,600000000,261,0.435,260,0.433,950,1.583,0,1
+t3_lv2_isr_O3_cacheon_board1.txt,isr,O3,cacheon,1,matmul 4x4 f32 (CMSIS-DSP),10000,600000000,142,0.236,141,0.235,747,1.245,0,1
+t3_lv2_isr_O3_cacheon_board1.txt,isr,O3,cacheon,1,matmul 12x12 f32,10000,600000000,2846,4.743,2846,4.743,4769,7.948,0,1
+t3_lv2_isr_O3_cacheon_board1.txt,isr,O3,cacheon,1,matmul 12x12 f32 (CMSIS-DSP),10000,600000000,2471,4.118,2466,4.11,3838,6.396,0,1
+t3_lv2_isr_O3_cacheon_board1.txt,isr,O3,cacheon,1,"PID 3-axis, 1 update",10000,600000000,139,0.231,139,0.231,781,1.301,0,1
+t3_lv2_isr_O3_cacheon_board1.txt,isr,O3,cacheon,1,sinf,10000,600000000,171,0.285,171,0.285,414,0.69,0,1
+t3_lv2_isr_O3_cacheon_board1.txt,isr,O3,cacheon,1,cosf,10000,600000000,191,0.318,191,0.318,408,0.68,0,1
+t3_lv2_isr_O3_cacheon_board1.txt,isr,O3,cacheon,1,sqrtf,10000,600000000,31,0.051,31,0.051,65,0.108,2964,0
+t3_lv2_isr_O3_cacheon_board1.txt,isr,O3,cacheon,1,atan2f,10000,600000000,298,0.496,296,0.493,1101,1.835,0,1
+t3_lv2_isr_O3_cacheon_board1.txt,isr,O3,cacheon,1,attitude step (quat integrate + normalize),10000,600000000,98,0.163,98,0.163,357,0.595,0,2
+t3_lv2_isr_O3_cacheon_board1.txt,isr,O3,cacheon,1,ISR period (target 600000 cycles = 1 ms),10000,600000000,599999,999.998,599894,999.823,600035,1000.058,877,9987
+t3_lv2_isr_O3_cacheon_board1.txt,isr,O3,cacheon,1,period deviation |period - 600000| (jitter),10000,600000000,0,0.0,0,0.0,106,0.176,0,1
+t3_lv2_isr_O3_cacheon_board1.txt,isr,O3,cacheon,1,ISR execution time (PID + 12x12 matmul),10000,600000000,3044,5.073,3036,5.06,3120,5.2,5461,0
+t3_lv2_isr_O3_cacheon_board1.txt,isr,O3,cacheon,1,"interrupt latency (CNT at handler start, in CPU cycles)",10000,600000000,43,0.071,43,0.071,79,0.131,877,0
 t3_lv2_isr_O3_cacheon_board2.txt,isr,O3,cacheon,2,matmul 4x4 f32,10000,600000000,261,0.435,260,0.433,949,1.581,0,1
 t3_lv2_isr_O3_cacheon_board2.txt,isr,O3,cacheon,2,matmul 4x4 f32 (CMSIS-DSP),10000,600000000,142,0.236,141,0.235,747,1.245,0,1
 t3_lv2_isr_O3_cacheon_board2.txt,isr,O3,cacheon,2,matmul 12x12 f32,10000,600000000,2846,4.743,2846,4.743,4770,7.95,0,1
