@@ -6,7 +6,7 @@
 - [x] SDK `Binaries` 폴더의 CLI 펌웨어 플래싱 (절차: SDK `Documentation/Developer Manual` 5.4.2절)
 - [x] 한쪽 initiator(`INITF`), 다른 쪽 responder(`RESPF`)로 TWR 레인징, PC 시리얼에 거리 출력 확인
 - [x] 로깅 스크립트로 시리얼 → CSV (timestamp, sequence_number, mac_address, status, distance_cm, success). 위치: `../common/logger/`. CLI 기본 출력에 RSSI와 first-path power가 없어서 저장하지 않음
-- [ ] 안테나 딜레이 보정 (아래 기록. 보정하지 않음, `LISTCAL` 보정 키 값 기록이 남음)
+- [x] 안테나 딜레이 보정 (아래 기록. 보정하지 않고 기본 보정값을 사용, `LISTCAL` 값 기록)
 - [ ] 배치 사진 `photos/`
 
 통과 기준 (PDF): 거리가 PC에 출력되고 CSV로 저장됨. 보정값이 README에 기록됨.
@@ -18,11 +18,27 @@
 | 측정 거리 | 1.00 m (두 보드의 안테나 사이) |
 | 측정 횟수 | 300 x 10 run |
 | 보정 전 평균 | 99.85 cm (전체 3000개, 표준편차 2.59 cm) |
-| 보정값 | 보정하지 않음 (기본 보정값 사용). `LISTCAL` 값: (직접 기재) |
+| 보정값 | 보정하지 않음 (기본 보정값 사용). `LISTCAL` 값은 아래 참고 |
 | 보정 후 평균 | 해당 없음 |
 | 측정 날짜·장소 | 2026-11-06, 실내 |
 
 보정하지 않은 이유: 전체 평균 오차(-0.15 cm)가 측정 잡음(표준편차 2.59 cm)과 cm 정수 출력 단위보다 작다. SDK 매뉴얼에 따르면 DWM3001CDK는 칩에 기본 보정값이 들어 있다(OTP).
+
+`LISTCAL` 출력(2026-11-09, 레인징 중이 아닌 대기 상태). 거리 보정과 관련된 키:
+
+| 키 | CDK 1 | CDK 2 |
+| --- | --- | --- |
+| `ant0.ch9.ant_delay` | `0x00003ffb` (16379) | `0x00003ffb` (16379) |
+| `ant0.ch5.ant_delay` | `0x00003ff2` (16370) | `0x00003ff5` (16373) |
+| `xtal_trim` | `0x19` | `0x19` |
+| `ant0.ch9.ref_frame0.tx_power_index` | `0x1b1b1b1b` | `0x14141414` |
+| `ant0.ch5.ref_frame0.tx_power_index` | `0x1e1e1e1e` | `0x1b1b1b1b` |
+
+- 채널 9의 안테나 딜레이는 두 보드가 같다. 채널 5는 3 차이가 난다.
+- 송신 전력 값과 `pg_count`는 두 보드가 다르다(CDK 1 `pg_count` ch5/ch9 `0xb0`/`0xb0`, CDK 2 `0xb3`/`0xb2`). 보드마다 공장에서 쓴 값이 다르다.
+- `INITF` 기본값은 채널 9이므로(매뉴얼 기준) 레인징에는 `ant0.ch9.ant_delay`가 쓰였을 것으로 본다. 이번 실행의 채널은 `STAT`로 확인하지 않았다.
+- 출력에서 `ant0`만 송신 전력 값과 `pg_count`가 설정되어 있고 `ant1`~`ant3`는 0이다.
+- 이 값들은 보드의 OTP에서 온 기본값이다. SDK 릴리스 노트에 "OTP 값을 기본으로 쓴다"고 되어 있다.
 
 ## Lv1 데이터
 
