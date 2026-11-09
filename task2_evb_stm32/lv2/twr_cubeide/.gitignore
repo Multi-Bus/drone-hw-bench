@@ -1,0 +1,9 @@
+STM32CubeIDE/FSBL/UWBStack/
+**/Debug/
+**/Release/
+*.elf
+*.bin
+*.o
+*.d
+*.map
+*.bak
