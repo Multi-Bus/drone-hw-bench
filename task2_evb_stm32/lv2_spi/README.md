@@ -7,12 +7,12 @@
 
 | 단계 | 내용 | 상태 |
 | --- | --- | --- |
-| 1 | 전원·로직 레벨·핀맵 확인 | 문서로 대조 완료 ([`pinmap.md`](pinmap.md)). 실물 연결 후 검증 칸을 채운다 |
-| 2 | SPI Master 프로젝트 (폴링) | 코드 작성, **빌드(링크 포함) 확인.** CubeIDE 빌드와 보드 실행은 아직 |
-| 3 | SPI SCK/MOSI/MISO/CS, RSTn/IRQ 설정 | 코드에 반영 (`uwb_port.c`). 실물 확인 전 |
-| 4 | `uwb_port.c/.h` | 작성 완료, 보드 시험 전 |
-| 5 | Device ID 읽기 | **보드에서 아직 실행하지 않았다** |
-| 6 | 인수인계 | 이 README. 5단계 후 결과 추가 |
+| 1 | 전원·로직 레벨·핀맵 확인 | **완료.** 문서로 대조했고 보드 2 실물에서 동작으로 확인됨 ([`pinmap.md`](pinmap.md)) |
+| 2 | SPI Master 프로젝트 (폴링) | **완료.** CubeIDE 빌드 `0 errors`, 보드 2에서 실행 |
+| 3 | SPI SCK/MOSI/MISO/CS, RSTn/IRQ 설정 | **완료.** 보드 2에서 SCK, MISO, CS, RSTn 동작 확인. **MOSI는 이 시험으로 검증되지 않았다** (아래 "결과"). IRQ 핀은 읽기만 했다 |
+| 4 | `uwb_port.c/.h` | **완료.** 보드 2에서 시험됨 (SPI 읽기, 리셋). 쓰기(`uwb_spi_write`)와 빠른 속도(8 MHz)는 아직 시험 전 |
+| 5 | Device ID 읽기 | **보드 2에서 PASS.** `0xDECA0302` 20/20, 리셋 없이 10/10. 전원 재투입 반복과 보드 1은 아직 |
+| 6 | 인수인계 | 이 README와 `pinmap.md`, 로그 `logs/device_id_board2.txt`. 남은 확인은 "알려진 제약" 참고 |
 
 ## 보드와 연결
 
@@ -61,23 +61,49 @@ int uwb_spi_write(uint16_t header_len, const uint8_t *header, uint16_t body_len,
 4. USB를 연결한다. **실드의 `LED1`이 켜지는지 본다** (DC-DC 출력 확인, 회로도 기준). 안 켜지거나 보드가 뜨거워지면 바로 뽑는다.
 5. **우클릭 > Debug As > STM32 Cortex-M C/C++ Application.** `main`에서 멈추면 Tera Term(115200, 7 bit, odd, 1, none)에서 **로그를 켠 뒤** Resume. RESET 버튼은 누르지 않는다 (개발 모드).
 
-### 기대 출력
+### 출력 형식 (실제 결과의 일부)
 
 ```
 == T2 Lv2: DWM3000EVB Device ID test ==
-SPI clock = 2000000 Hz, IRQ level = 0
-#01 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=0  OK (C0 silicon)
+SPI clock = 2000000 Hz, IRQ level = 1
+#01 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=1  OK (C0 silicon)
 ...
 verdict: PASS
 ```
 
 판정: 20번 모두 `0xDECA03xx`(DW3000 계열)이고 리셋 없이 다시 읽은 10번이 첫 값과 같으면 PASS. `0x00000000`은 응답 없음(전원, CS, 배선), `0xFFFFFFFF`는 MISO가 떠 있음(장치 없음 또는 배선), 다른 값은 SPI 모드나 속도부터 점검한다.
 
+## 결과 (Device ID)
+
+보드 2 (가상 COM6)에서 2026-11-09 실행. 원본 로그: [`logs/device_id_board2.txt`](logs/device_id_board2.txt) (Tera Term 로그 파일, 옮겨 적은 값이 아님).
+
+| 항목 | 결과 |
+| --- | --- |
+| 리셋 후 DEV_ID 읽기 | **20 / 20** 모두 `0xDECA0302`, SPI 오류 0 |
+| 리셋 없이 다시 읽기 | **10 / 10** 첫 값과 같음 |
+| 값의 해석 | RIDTAG `DECA`, MODEL `03`, VER `0`, REV `2` (C0 실리콘). Qorvo API가 정상으로 판정하는 값 (`0xDECA0302` 또는 `0xDECA0312`) |
+| 받은 바이트 | `02 03 CA DE` (리틀엔디언) |
+| SPI | 모드 0, 2 MHz, CS = PA3 (소프트웨어), RSTn = PE11 (open-drain, Low 약 2~3 ms 후 약 5 ms 대기) |
+| 판정 | **PASS** |
+
+이 결과로 확인된 것:
+
+- DEV_ID 읽기의 SPI 헤더 한 바이트 `0x00`이 맞다 (이전에는 Qorvo 코드에서 도출한 추정이었음).
+- SCK (PE15), MISO (PG1), CS (PA3), RSTn (PE11)이 보드 2에서 동작한다.
+- 전원: J1이 `3V3_DCDC`인 상태에서 Nucleo의 `5V` 핀으로 EVB가 동작한다. 디지털 I/O 3.3 V도 맞다.
+
+**검증되지 않은 것: MOSI (PG2, D11).** DEV_ID를 읽을 때 MOSI로 보내는 바이트는 헤더 `0x00`과 더미 `0x00` 네 개로 **모두 0**이다. 그래서 MOSI가 Low로 눌려 있어도 같은 결과가 나온다. 다른 Nucleo-144(F429ZI)에서는 이더넷 때문에 D11이 눌려서 납땜 브리지를 바꿔야 했다는 보고가 있으므로 ([foldedtoad/dwm3000 README](https://github.com/foldedtoad/dwm3000)), **MOSI에서 0이 아닌 값이 나가는 시험**(레지스터를 쓴 뒤 읽어서 되돌아오는지, 또는 0이 아닌 헤더가 필요한 레지스터 읽기)으로 확인해야 한다. 이 확인이 끝나기 전에는 "SPI 4선이 모두 검증됐다"고 말하지 않는다.
+
+관찰 (원인 미확인):
+
+- **IRQ 핀(PD12)이 처음부터 계속 1(High)로 읽혔다.** 초기화 직후(리셋 전)와 매 리셋 후 모두 1이었다. IRQ는 DW3000이 구동하는 출력이고 우리는 풀다운을 걸었으므로, 모듈이 High로 구동하고 있다는 뜻이다. 칩이 켜진 직후 처리되지 않은 상태 플래그(예: `SYS_STATUS`의 `RCINIT`, `SPIRDY`)가 있어 IRQ가 올라가 있을 가능성이 있지만 확인하지 않았다. Device ID 읽기에는 영향이 없었다. TWR 담당자가 인터럽트를 쓸 때 `SYS_STATUS`를 읽어서 확인하고 플래그를 지워야 한다.
+
 ## 알려진 제약과 확인 필요
 
-- **보드에서 아직 실행하지 않았다.** 빌드(링크)까지만 확인했다.
-- DEV_ID 읽기의 SPI 헤더를 `0x00` 한 바이트로 보낸다 (읽기, 레지스터 파일 0, 오프셋 0). Qorvo `dwt_xfer3000()` 코드에서 도출한 값이고 첫 실제 읽기로 확인된다.
-- 기대 Device ID는 `0xDECA0302`(C0) 또는 `0xDECA0312`(C0 PDOA)를 "인식"으로 세고, `0xDECA03xx`는 "DW3000 계열"로 센다. 정확한 값은 모듈 리비전에 따라 다를 수 있어 읽은 값을 로그에 그대로 남긴다.
-- N6 Nucleo에서 D11(MOSI)을 다른 주변장치가 누르는지는 매뉴얼에서 확인하지 못했다. MOSI가 이상하면 이 점을 먼저 본다.
+- **보드 2에서 한 번 실행했다.** 전원을 다시 넣거나 USB를 다시 연결해서 반복한 시험과 보드 1에서의 시험은 아직이다 (친구 문서의 "재부팅·재연결 반복" 항목).
+- DEV_ID 읽기의 SPI 헤더는 `0x00` 한 바이트 (읽기, 레지스터 파일 0, 오프셋 0)다. 실제 읽기로 확인됐다. 다른 레지스터(오프셋이 있는 레지스터, 쓰기)의 헤더는 Qorvo 드라이버(`dwt_xfer3000`)가 만든다 (이 포팅은 1바이트 또는 2바이트 헤더를 그대로 받는다).
+- 이 모듈(DWM3000 v1.4)의 Device ID는 `0xDECA0302`다. 다른 리비전의 모듈은 다른 값일 수 있어 `0xDECA03xx`를 "DW3000 계열"로도 센다.
+- **MOSI(D11)는 아직 검증되지 않았다** (위 "결과" 참고). 쓰기가 필요한 Qorvo 초기화(`dwt_initialise`)가 시작되면 드러난다.
+- 8 MHz(`uwb_port_spi_fast()`)와 `uwb_spi_write()`도 아직 시험하지 않았다. Device ID는 초기화 전이라 느린 속도로만 읽었다.
 - 회로도(V1.2)와 실물(`Module shield v1.3`)의 리비전 차이는 확인하지 못했다.
 - `.project`/`.cproject`를 바꾸면 Close Project → Open Project로 다시 읽힌다 (`../../삽질기록.md` 참고).
