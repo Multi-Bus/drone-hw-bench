@@ -20,6 +20,7 @@
 - EVB는 Arduino 실드라서 **Nucleo의 Arduino 헤더에 직접 꽂는다.** 점퍼선 불필요 (헤더 정렬은 사용자가 눈으로 확인함).
 - 핀 (근거와 주의는 [`pinmap.md`](pinmap.md)): SPI5 SCK = PE15 (D13), MISO = PG1 (D12), MOSI = PG2 (D11), CS = PA3 (D10, GPIO), RSTn = PE11 (D7, open-drain), IRQ = PD12 (D8).
 - **구동하면 안 되는 핀:** PE0 (D4), PE9 (D3) (모듈 출력, LED), PD8 (D1), PD9 (D0) (SPI 모드 설정 핀). 코드는 이 핀을 설정하지 않는다.
+- **장착 (2026-11-09, 보드 2):** 전원을 끈 상태에서 헤더 위치를 확인하고 꽂았다. USB 연결 후 EVB의 `LED1`(DC-DC 출력)이 켜졌고 Nucleo의 전원·통신 LED도 정상이며 뜨거운 부분은 없었다 (사용자 확인). 사진: [`docs/evb_on_nucleo_board2.jpg`](docs/evb_on_nucleo_board2.jpg). 사진만으로 핀 정렬을 완전히 확인할 수는 없고, `LED1` 점등은 `5V` 핀이 연결됐다는 증거다.
 - 전원: EVB의 J1 점퍼가 `3V3_DCDC`(핀 1-2)로 보인다 (사진 [`docs/evb_j1_closeup.jpg`](docs/evb_j1_closeup.jpg)). 이 상태에서는 EVB가 Nucleo의 `5V` 핀으로 동작한다. 점퍼는 바꾸지 않는다.
 
 ## 프로젝트 (`T2_UWB_SPI/`)
