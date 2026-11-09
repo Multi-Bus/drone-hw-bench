@@ -9,6 +9,7 @@
  */
 
 #include <errno.h>
+#include <stdio.h>
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
@@ -70,6 +71,15 @@ static K_FIFO_DEFINE(fifo_uart_rx_data);
 static struct bt_conn *default_conn;
 static struct bt_nus_client nus_client;
 
+/* Task 4 Lv2 distance test: RSSI of the link, printed as "RSSI,<ms>,<dBm>" once a second */
+static struct k_work_delayable rssi_work;
+#define RSSI_PERIOD K_SECONDS(1)
+/* NUS notifications subscribed? If service discovery stalls after connecting, the handler retries it */
+static volatile bool nus_ready;
+static uint32_t conn_ms;
+/* Keeps a whole NUS notification and one RSSI line from being interleaved on the UART */
+K_MUTEX_DEFINE(uart_tx_lock);
+
 static void ble_data_sent(struct bt_nus_client *nus, uint8_t err,
 					const uint8_t *const data, uint16_t len)
 {
@@ -91,11 +101,14 @@ static uint8_t ble_data_received(struct bt_nus_client *nus,
 
 	int err;
 
+	k_mutex_lock(&uart_tx_lock, K_FOREVER);
+
 	for (uint16_t pos = 0; pos != len;) {
 		struct uart_data_t *tx = k_malloc(sizeof(*tx));
 
 		if (!tx) {
 			LOG_WRN("Not able to allocate UART send data buffer");
+			k_mutex_unlock(&uart_tx_lock);
 			return BT_GATT_ITER_CONTINUE;
 		}
 
@@ -126,6 +139,7 @@ static uint8_t ble_data_received(struct bt_nus_client *nus,
 		}
 	}
 
+	k_mutex_unlock(&uart_tx_lock);
 	return BT_GATT_ITER_CONTINUE;
 }
 
@@ -325,7 +339,9 @@ static void discovery_complete(struct bt_gatt_dm *dm,
 	bt_gatt_dm_data_print(dm);
 
 	bt_nus_handles_assign(dm, nus);
-	bt_nus_subscribe_receive(nus);
+	if (!bt_nus_subscribe_receive(nus)) {
+		nus_ready = true;
+	}
 
 	bt_gatt_dm_data_release(dm);
 }
@@ -376,6 +392,80 @@ static void exchange_func(struct bt_conn *conn, uint8_t err, struct bt_gatt_exch
 	}
 }
 
+static void rssi_uart_send(const char *line, int len)
+{
+	struct uart_data_t *tx = k_malloc(sizeof(*tx));
+
+	if (!tx) {
+		return;
+	}
+
+	memcpy(tx->data, line, len);
+	tx->len = len;
+
+	k_mutex_lock(&uart_tx_lock, K_FOREVER);
+	if (uart_tx(uart, tx->data, tx->len, SYS_FOREVER_MS)) {
+		k_fifo_put(&fifo_uart_tx_data, tx);
+	}
+	k_mutex_unlock(&uart_tx_lock);
+}
+
+/* Every second one line: "RSSI,<ms>,<dBm>" or "RSSI_ERR,<ms>,<stage>,<code>" (diagnostic) */
+static void rssi_work_handler(struct k_work *item)
+{
+	char line[64];
+	int n;
+	uint16_t handle;
+	uint32_t now = k_uptime_get_32();
+	struct net_buf *buf;
+	struct net_buf *rsp = NULL;
+	struct bt_hci_cp_read_rssi *cp;
+	struct bt_hci_rp_read_rssi *rp;
+	int err;
+
+	if (!default_conn) {
+		n = snprintf(line, sizeof(line), "RSSI_ERR,%u,no_conn,0\n", now);
+	} else if (bt_hci_get_conn_handle(default_conn, &handle)) {
+		n = snprintf(line, sizeof(line), "RSSI_ERR,%u,no_handle,0\n", now);
+	} else {
+		buf = bt_hci_cmd_create(BT_HCI_OP_READ_RSSI, sizeof(*cp));
+		if (!buf) {
+			n = snprintf(line, sizeof(line), "RSSI_ERR,%u,no_buf,0\n", now);
+		} else {
+			cp = net_buf_add(buf, sizeof(*cp));
+			cp->handle = sys_cpu_to_le16(handle);
+
+			err = bt_hci_cmd_send_sync(BT_HCI_OP_READ_RSSI, buf, &rsp);
+			if (err) {
+				n = snprintf(line, sizeof(line), "RSSI_ERR,%u,send,%d\n", now, err);
+			} else {
+				rp = (struct bt_hci_rp_read_rssi *)rsp->data;
+				if (rp->status) {
+					n = snprintf(line, sizeof(line), "RSSI_ERR,%u,status,%u\n",
+						     now, rp->status);
+				} else {
+					n = snprintf(line, sizeof(line), "RSSI,%u,%d\n", now, rp->rssi);
+				}
+				net_buf_unref(rsp);
+			}
+		}
+	}
+
+	rssi_uart_send(line, n);
+
+	if (default_conn) {
+		n = snprintf(line, sizeof(line), "STATE,%u,sec=%d,nus=%d\n", now,
+			     bt_conn_get_security(default_conn), nus_ready);
+		rssi_uart_send(line, n);
+		/* Discovery normally starts when security changes; retry if that never happened */
+		if (!nus_ready && (now - conn_ms) > 4000) {
+			gatt_discover(default_conn);
+		}
+	}
+
+	k_work_reschedule(&rssi_work, RSSI_PERIOD);
+}
+
 static void connected(struct bt_conn *conn, uint8_t conn_err)
 {
 	char addr[BT_ADDR_LE_STR_LEN];
@@ -402,6 +492,10 @@ static void connected(struct bt_conn *conn, uint8_t conn_err)
 	}
 
 	LOG_INF("Connected: %s", addr);
+
+	nus_ready = false;
+	conn_ms = k_uptime_get_32();
+	k_work_reschedule(&rssi_work, RSSI_PERIOD);
 
 	static struct bt_gatt_exchange_params exchange_params;
 
@@ -437,6 +531,7 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 		return;
 	}
 
+	nus_ready = false;
 	bt_conn_unref(default_conn);
 	default_conn = NULL;
 
@@ -613,6 +708,8 @@ int main(void)
 		return 0;
 	}
 	LOG_INF("Bluetooth initialized");
+
+	k_work_init_delayable(&rssi_work, rssi_work_handler);
 
 	if (IS_ENABLED(CONFIG_SETTINGS)) {
 		settings_load();

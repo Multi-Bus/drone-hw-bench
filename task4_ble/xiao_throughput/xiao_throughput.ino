@@ -10,6 +10,11 @@
 //
 // Everything the central writes to the NUS RX characteristic is echoed back at once (RTT test).
 //
+// Auto mode (distance test, XIAO on a power bank, no PC): until the first serial line arrives, the XIAO
+// starts sending 64 B x 50 packets/s at a 7.5 ms connection interval as soon as the central enables
+// notifications, and resumes after a reconnect (seq keeps counting). Any serial line switches to manual mode.
+// The blue LED shows the state: blinking = waiting for the central, on = connected.
+//
 // Packet (ASCII): "<seq>,<millis>," + 'x' padding + "\n", exactly <len> bytes.
 // The receiver reads lines; a gap in seq means a lost packet.
 #include <Adafruit_TinyUSB.h>
@@ -25,6 +30,10 @@ uint16_t ci_units = 12;                  // connection interval, unit 1.25 ms (1
 uint32_t rate = 0;                       // packets per second, 0 = as fast as possible
 uint32_t period_us = 0, next_us = 0;
 bool running = false;
+bool manual = false;                     // true after the first serial line: no auto mode
+bool auto_started = false;               // auto mode has reset the counters once
+static const uint16_t AUTO_LEN = 64, AUTO_CI_UNITS = 6;   // 6 x 1.25 ms = 7.5 ms
+static const uint32_t AUTO_RATE = 50;
 uint32_t seq = 0, tx_pkts = 0, tx_bytes = 0, t_start = 0;
 
 uint8_t pend[PKT_MAX];                   // packet being written; kept until the FIFO took all of it
@@ -40,9 +49,11 @@ void connect_callback(uint16_t hdl) {
 void disconnect_callback(uint16_t hdl, uint8_t reason) {
   (void)hdl; (void)reason;
   conn_hdl = BLE_CONN_HANDLE_INVALID;
+  if (!manual) running = false;          // auto mode restarts after the reconnect
 }
 
 void setup() {
+  pinMode(LED_BLUE, OUTPUT);             // status LED (active low): blinking = waiting, on = connected
   Serial.begin(115200);
   Bluefruit.configPrphBandwidth(BANDWIDTH_MAX);   // must be called before begin()
   Bluefruit.begin();
@@ -71,6 +82,7 @@ void build_packet() {
 
 void handle_line(String line) {
   line.trim();
+  if (!manual) { manual = true; running = false; }   // a PC is controlling: leave auto mode
   if (line.startsWith("CFG")) {
     // "CFG <len> <ci_ms>"; sscanf can't read floats in this core's newlib-nano
     int sp = line.indexOf(' ', 4);
@@ -115,6 +127,7 @@ void handle_line(String line) {
 
 void loop() {
   static String line;
+  digitalWrite(LED_BLUE, conn_hdl == BLE_CONN_HANDLE_INVALID ? ((millis() / 500) & 1) : LOW);
   while (Serial.available()) {
     char c = Serial.read();
     if (c == '\n') { handle_line(line); line = ""; }
@@ -125,6 +138,20 @@ void loop() {
     uint8_t echo[PKT_MAX];
     int n = bleuart.read(echo, sizeof echo);
     bleuart.write(echo, n);
+  }
+
+  if (!manual && !running && conn_hdl != BLE_CONN_HANDLE_INVALID && bleuart.notifyEnabled()) {
+    // The central has finished service discovery, so it is safe to ask for the interval now.
+    pkt_len = AUTO_LEN;
+    rate = AUTO_RATE;
+    period_us = 1000000UL / AUTO_RATE;
+    ci_units = AUTO_CI_UNITS;
+    Bluefruit.Periph.setConnInterval(ci_units, ci_units);
+    Bluefruit.Connection(conn_hdl)->requestConnectionParameter(ci_units);
+    if (!auto_started) { seq = tx_pkts = tx_bytes = 0; t_start = millis(); auto_started = true; }
+    pend_len = 0;
+    next_us = micros();
+    running = true;
   }
 
   if (!running || !bleuart.notifyEnabled()) return;

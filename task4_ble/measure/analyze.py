@@ -1,6 +1,6 @@
 """Task 4: raw CSV -> result tables and graphs.
 
-Reads   data/lv1/pc_rx, data/lv2/{throughput,rate_check,rtt}
+Reads   data/lv1/pc_rx, data/lv2/{throughput,rate_check,rtt,distance}
 Writes  the tables between <!-- BEGIN:table --> and <!-- END:table --> in results/*.md
         and the graphs in results/figures/*.png
 Run:    python measure/analyze.py
@@ -10,6 +10,7 @@ by hand and is never touched. Everything inside the markers is regenerated from 
 the tables always match the data.
 """
 import csv
+import math
 import statistics as st
 from pathlib import Path
 
@@ -189,8 +190,67 @@ def rtt():
     save(fig, "lv2_rtt_cdf.png")
 
 
+# ---------------------------------------------------------------- Lv2: distance
+def distance():
+    d = DATA / "lv2" / "distance"
+    runs = {}
+    for r in read_csv(d / "summary.csv"):          # file order = measurement order
+        runs.setdefault(int(r["dist_m"]), []).append(r)
+
+    agg = []
+    for dist, rs in sorted(runs.items()):
+        means = [float(r["rssi_mean"]) for r in rs]
+        stds = [float(r["rssi_std"]) for r in rs]
+        # every run has the same number of RSSI samples, so the pooled variance is
+        # (mean of within-run variances) + (variance of the run means)
+        pooled_std = math.sqrt(st.mean(s * s for s in stds) + st.pstdev(means) ** 2)
+        exp = sum(int(r["expected_pkts"]) for r in rs)
+        rx = sum(int(r["rx_pkts"]) for r in rs)
+        agg.append([f"{dist} m", f"{len(rs)}회 × {rs[0]['duration_s']} s", f"{st.mean(means):.1f}",
+                    f"{pooled_std:.1f}", f"{max(int(r['rssi_max']) for r in rs)} / {min(int(r['rssi_min']) for r in rs)}",
+                    f"{rx} / {exp} ({100 * rx / exp:.1f}%)", sum(int(r["seq_gaps"]) for r in rs),
+                    sum(int(r["rssi_err_lines"]) for r in rs)])
+
+    per_run = []
+    for dist, rs in sorted(runs.items()):
+        for k, r in enumerate(rs, 1):
+            raw = "원자료 CSV 있음" if k == len(rs) else "요약만 (CSV는 재측정으로 덮어씀)"
+            per_run.append([f"{dist} m", k, r["run_time"].replace("T", " "),
+                            f"{r['rx_pkts']} / {r['expected_pkts']}", f"{float(r['shortfall_pct']):.2f}%",
+                            f"{r['rssi_mean']} ({r['rssi_min']} ~ {r['rssi_max']})", r["rssi_std"], raw])
+
+    table = ("### 거리별 요약\n\n" + md_table(
+        ["거리", "측정 횟수", "RSSI 평균 (dBm)", "표준편차", "최대 / 최소 (dBm)", "수신 / 기대 (성공률)",
+         "seq 끊김", "연결 끊김 줄"], agg)
+        + "\n\n### 측정 회차별\n\n" + md_table(
+        ["거리", "회차", "측정 시각", "수신 / 기대", "부족분", "RSSI 평균 (최소 ~ 최대)", "표준편차", "원자료"], per_run))
+    write_block("lv2_distance.md", table)
+
+    fig, (a, b) = plt.subplots(1, 2, figsize=(9, 3.8))
+    dists = sorted(runs)
+    for dist in dists:
+        rs = runs[dist]
+        a.errorbar([dist] * len(rs), [float(r["rssi_mean"]) for r in rs], yerr=[float(r["rssi_std"]) for r in rs],
+                   fmt="o", color="#4c78a8", capsize=3)
+        b.plot([dist] * len(rs), [float(r["shortfall_pct"]) for r in rs], "o", color="#e45756")
+    a.plot(dists, [st.mean(float(r["rssi_mean"]) for r in runs[x]) for x in dists], "-", color="#4c78a8", alpha=0.4)
+    a.set_xticks(dists)
+    a.set_xlabel("distance (m)")
+    a.set_ylabel("RSSI at dongle (dBm), mean +- std")
+    a.set_title("RSSI vs distance (1 dot = 1 run of 60 s)")
+    a.grid(alpha=0.3)
+    b.axhline(0, color="gray", lw=1)
+    b.set_xticks(dists)
+    b.set_xlabel("distance (m)")
+    b.set_ylabel("packets missing vs 50 Hz x 60 s (%)")
+    b.set_title("Missing packets (seq gaps: 0 in all runs)")
+    b.grid(alpha=0.3)
+    save(fig, "lv2_distance.png")
+
+
 if __name__ == "__main__":
     lv1()
     throughput()
     rate_check()
     rtt()
+    distance()

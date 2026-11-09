@@ -8,8 +8,8 @@
 | 레벨 | 상태 | 비고 |
 | --- | --- | --- |
 | Lv1 동작 확인 | 완료 | 스마트폰 수신, 동글 경유 PC 수신 모두 근거 있음 |
-| Lv2 성능 측정 | 진행 중 | 시퀀스·타임스탬프, 처리량, RTT, 요구치 비교 완료. 거리별 RSSI·손실률 남음 |
-| Lv3 심화 | 시작 전 | Lv2 완료 후 |
+| Lv2 성능 측정 | 완료 | 시퀀스·타임스탬프, 처리량, RTT, 요구치 비교, 거리별 RSSI·손실률 |
+| Lv3 심화 | 시작 전 | |
 
 ## 결과 요약
 
@@ -21,7 +21,7 @@
 | Lv2 | 처리량 | 20~240 B, 간격 7.5~100 ms 전 조건에서 3.2 kB/s 이상, 최고 약 109.5 kB/s (240 B·15 ms). 간격이 긴 조건에서 손실 최대 약 5% | [`results/lv2_throughput.md`](results/lv2_throughput.md) |
 | Lv2 | 요구치 비교 (50 Hz × 64 B) | 간격 7.5 / 30 / 100 ms 모두 손실 0 (9회, 27,013 패킷) | [`results/lv2_rate_check.md`](results/lv2_rate_check.md) |
 | Lv2 | RTT | 평균 26 ms(7.5 ms 간격) ~ 180 ms(100 ms 간격), 1,000회 모두 응답 | [`results/lv2_rtt.md`](results/lv2_rtt.md) |
-| Lv2 | 거리별 RSSI·손실률 | 미측정 | |
+| Lv2 | 거리별 RSSI·손실률 (50 Hz × 64 B, 각 60초) | 실내 복도. 1 / 5 / 10 m는 손실 없음(RSSI -58 / -72 / -76 dBm). 20 m(-77.5 dBm)는 4회 중 3회 정상, 1회는 수신 28.9% 부족. seq 끊김은 전부 0 | [`results/lv2_distance.md`](results/lv2_distance.md) |
 
 ## 폴더 구조
 
@@ -36,8 +36,9 @@ task4_ble/
     lv2/throughput/      초당 수신 bytes (조건×회차) + summary.csv
     lv2/rate_check/      고정 속도(50 Hz × 64 B) 결과
     lv2/rtt/             번호별 RTT
-  photos/                스마트폰 수신 스크린샷, (측정 배치 사진은 추가 예정)
-  measure/               throughput.py, rtt.py(측정), analyze.py(원자료 → 표·그래프)
+    lv2/distance/        거리별 초당 수신 패킷·RSSI + summary.csv
+  photos/                스마트폰 수신 스크린샷 (측정 배치 사진은 없음)
+  measure/               throughput.py, rtt.py, distance.py(측정), check_link.py(링크 점검), analyze.py(원자료 → 표·그래프)
   xiao_blink/ xiao_peripheral/ xiao_throughput/    XIAO 스케치 (Lv1 / Lv1 / Lv2)
   dongle_central/        동글 central 펌웨어 (빌드 방법, hex)
 ```
@@ -59,10 +60,10 @@ task4_ble/
 - [x] 1. 패킷에 시퀀스 번호와 타임스탬프 (`seq,millis`, 손실·지연 계산용)
 - [x] 2. 처리량: 최대 bytes/s (패킷 크기, connection interval 변경) — [`results/lv2_throughput.md`](results/lv2_throughput.md)
 - [x] 3. RTT: PC → 동글 → XIAO → 에코 → PC, 1,000회 평균·최대 — [`results/lv2_rtt.md`](results/lv2_rtt.md)
-- [ ] 4. 거리별 RSSI와 패킷 손실률: 1 / 5 / 10 / 20 m, 각 1분
+- [x] 4. 거리별 RSSI와 패킷 손실률: 1 / 5 / 10 / 20 m, 각 1분 — [`results/lv2_distance.md`](results/lv2_distance.md)
 - [x] 5. 드론 요구치 비교 (50 Hz × 64 B = 3.2 kB/s 손실 없이 가능한지) — [`results/lv2_rate_check.md`](results/lv2_rate_check.md)
 
-Lv2 공통 결과물: 조건별 raw CSV(파일명에 조건 표기, 예 `t4_dist_5m.csv`), 결과 표(조건·측정 횟수·평균·표준편차·최대·성공률), 측정 배치 사진, 결론 한두 줄.
+Lv2 공통 결과물: 조건별 raw CSV(파일명에 조건 표기, 예 `t4_dist_5m.csv`), 결과 표(조건·측정 횟수·평균·표준편차·최대·성공률), 측정 배치 사진, 결론 한두 줄. 측정 배치 사진은 없다(제외하기로 함).
 
 ## Lv3 체크리스트 (심화)
 
@@ -88,6 +89,7 @@ Lv2 공통 결과물: 조건별 raw CSV(파일명에 조건 표기, 예 `t4_dist
 - XIAO: Arduino IDE에서 `xiao_peripheral/xiao_peripheral.ino`를 열고 Board = Seeed XIAO nRF52840 (Sense), 포트 선택 후 Upload.
 - 동글: `dongle_central/README.md` 참고. `dongle_central/build.sh`로 빌드하거나 `dongle_central/artifacts/central_uart_mtu247.hex`를 Programmer로 Write (RESET으로 부트로더 진입).
 - 처리량·요구치·RTT 측정: XIAO에 `xiao_throughput/xiao_throughput.ino` 업로드(Lv1의 `xiao_peripheral`을 대체), `pip install pyserial`, 그다음 `python measure/throughput.py --xiao <XIAO 포트> --dongle <동글 포트>`(처리량, `--rate 50 --lens 64`로 요구치) 또는 `python measure/rtt.py --xiao <XIAO 포트> --dongle <동글 포트>`(RTT). 결과는 `data/lv2/` 아래 해당 폴더에 저장된다.
+- 거리별 측정(Lv2 4번): 동글에 RSSI 출력 펌웨어(`dongle_central/artifacts/central_uart_rssi.hex`)를 올리고, XIAO는 `xiao_throughput`를 올린 뒤 PC에서 뽑아 보조배터리에 연결한다(시리얼 명령 없이 연결되면 64 B × 50 Hz를 자동으로 보낸다. 파란 LED: 깜빡임 = 대기, 켜짐 = 연결됨). `python measure/check_link.py --dongle <동글 포트>`로 링크를 점검하고 `python measure/distance.py --dongle <동글 포트> --dists <거리>`를 거리마다 따로 실행한다(Enter 후 3초 안정화 + 60초). 동글 포트를 다른 프로그램이 열고 있으면 안 되고, 측정 중에도 이 스크립트가 계속 포트를 읽어야 한다(안 읽으면 동글이 오래된 데이터를 쌓았다가 한꺼번에 내보낸다).
 
 ## 패킷 형식
 
@@ -103,4 +105,5 @@ ASCII 한 줄 `<seq>,<millis>\n`. seq는 송신 순번, millis는 XIAO 시계. L
 - Lv2 처리량 완료 (2026-11-08): `xiao_throughput` 스케치와 `measure/throughput.py`로 패킷 3종 × 연결 간격 5종, 조건당 30초 × 3회 측정. 막힘 3건(연결 직후 요청 충돌, MTU 65 제한, 동글 힙·버퍼 부족)은 삽질기록.md Task 4 참고.
 - Lv2 요구치 비교 완료 (2026-11-09): 스케치에 송신 속도 지정 추가, 64 B × 50패킷/초를 연결 간격 3종 × 60초 × 3회 측정, 손실 0.
 - Lv2 RTT 완료 (2026-11-09): XIAO 스케치에 에코 추가, `measure/rtt.py`로 연결 간격 3종 × 1,000회 측정, 응답률 100%, 평균 26~180 ms.
+- Lv2 거리별 RSSI·손실률 완료 (2026-11-09): 동글 펌웨어에 연결 RSSI 출력(1초마다 `RSSI,<ms>,<dBm>`)을 추가하고 XIAO 스케치에 자동 송신 모드와 상태 LED를 추가했다. 1 / 5 / 10 / 20 m 각 60초, 20 m는 4회. 막힘 4건(컨트롤러 RSSI 설정, 포트를 안 읽을 때 오래된 데이터, 간헐적 알림 구독 실패, LED/전원 오해)은 삽질기록.md Task 4 참고.
 - 데이터 정리 (2026-11-09): `data/`를 레벨/작업 폴더로 나누고, 결과 표·그래프는 `results/`로 옮겨 `measure/analyze.py`가 원자료에서 생성하도록 했다. 측정 대장 `MEASUREMENTS.md` 추가.
