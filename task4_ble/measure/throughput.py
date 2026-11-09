@@ -7,9 +7,9 @@ For every (packet length, connection interval) condition the script
   2. tells the XIAO to send as fast as it can (START) while counting bytes on the dongle port,
   3. stops (STOP), drains the dongle port, and compares what arrived with what the XIAO sent.
 Output per condition: <outdir>/t4_tp_len<L>_ci<C>ms_r<run>.csv  (bytes received in each second)
-Output summary:       <outdir>/t4_tp_summary.csv         (one row per condition)
+Output summary:       <outdir>/summary.csv               (one row per condition and run)
 
-Usage: python throughput.py --xiao COM3 --dongle COM8 --outdir ../data
+Usage: python throughput.py --xiao COM3 --dongle COM8        (writes to data/lv2/throughput)
 """
 import argparse
 import csv
@@ -143,13 +143,17 @@ def main():
     ap.add_argument("--run", type=int, default=1, help="repeat number, goes into file names and the summary")
     ap.add_argument("--rate", type=int, default=0,
                     help="packets per second, 0 = as fast as possible (throughput); e.g. 50 with --lens 64 for the 3.2 kB/s drone check")
-    ap.add_argument("--outdir", default=os.path.join(os.path.dirname(__file__), "..", "data"))
+    ap.add_argument("--outdir", default=None,
+                    help="default: data/lv2/throughput, or data/lv2/rate_check with --rate")
     args = ap.parse_args()
+    if args.outdir is None:
+        sub = "rate_check" if args.rate else "throughput"
+        args.outdir = os.path.join(os.path.dirname(__file__), "..", "data", "lv2", sub)
     os.makedirs(args.outdir, exist_ok=True)
 
     lens = [int(x) for x in args.lens.split(",")]
     cis = [float(x) for x in args.cis.split(",")]
-    summary_path = os.path.join(args.outdir, "t4_rate_summary.csv" if args.rate else "t4_tp_summary.csv")
+    summary_path = os.path.join(args.outdir, "summary.csv")
 
     with serial.Serial(args.xiao, 115200, timeout=0.5) as xiao, \
             serial.Serial(args.dongle, 115200, timeout=0.05) as dongle:

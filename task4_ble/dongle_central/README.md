@@ -9,6 +9,8 @@ Nordic `central_uart` 샘플(nRF Connect SDK v2.9.0)을 nRF52840 Dongle용으로
 - `central_uart/boards/nrf52840dongle_nrf52840.conf`: USB 스택과 `UART_ASYNC_ADAPTER` 켜기, 하드웨어 UART와 UART 콘솔 끄기, LFCLK를 내부 RC로 (신규)
 - `central_uart/prj.conf`: `CONFIG_BT_SETTINGS=n` (bonding 저장 끔. 켜져 있으면 USB가 열거되지 않음, [삽질기록](../../삽질기록.md) Task 4 참고). 보드 conf와 충돌하던 UART 콘솔 줄 제거
 - `central_uart/prj.conf` (Lv2 처리량용): `CONFIG_HEAP_MEM_POOL_SIZE` 2048 → 16384, `BT_L2CAP_TX_MTU=247`, `BT_BUF_ACL_RX_SIZE=251`, `BT_BUF_ACL_TX_SIZE=251`, `BT_CTLR_DATA_LENGTH_MAX=251`. 이전에는 MTU 65에 묶였고 최대 속도 송신에서 손실이 22–75%였다
+- `central_uart/prj.conf` (Lv2 거리별 측정용): `CONFIG_BT_CTLR_CONN_RSSI=y`. 이 설정이 없으면 컨트롤러가 HCI Read RSSI를 거부한다(`-EIO`)
+- `central_uart/src/main.c` (Lv2 거리별 측정용): 연결 중 1초마다 `RSSI,<ms>,<dBm>` 줄을 USB 시리얼로 출력(연결 없으면 `RSSI_ERR,<ms>,no_conn,0`), 진단용 `STATE,<ms>,sec=<보안 수준>,nus=<0/1>` 줄, 연결 4초 뒤에도 NUS 알림을 구독하지 못했으면 서비스 탐색 재시도. NUS 알림 한 개와 RSSI 줄이 UART에서 섞이지 않게 mutex로 묶음
 - `central_uart/src/main.c`: `UART_BUF_SIZE` 20 → 64 (244 B 알림을 13조각 대신 4조각으로 USB 시리얼에 전달)
 - `central_uart/src/main.c`: `peripheral_uart`와 같은 방식으로 `usb_enable()`, `uart_async_adapter` 추가 (CDC ACM이 비동기 UART API를 지원하지 않아서). `usb_enable()`을 `bt_enable()` 앞으로 옮김 (BT 실패와 무관하게 USB 열거)
 
@@ -21,7 +23,7 @@ NCS v2.9.0을 Toolchain Manager로 `C:\ncs`에 설치한 상태에서 Git Bash�
 task4_ble/dongle_central/build.sh
 ```
 
-결과: `central_uart/build_hwb/merged.hex` (복사본: `artifacts/central_uart_mtu247.hex`).
+결과: `central_uart/build_hwb/merged.hex` (복사본: `artifacts/central_uart_rssi.hex`가 현재 버전. `central_uart_mtu247.hex`는 RSSI 출력이 없는 이전 버전으로, 처리량·요구치·RTT 측정에 쓴 것).
 
 빌드 폴더가 깊으면 Windows 경로 길이 제한(260자)에 걸려 실패할 수 있음. 그때는 `build.sh`의 `-d` 경로를 `C:\hwb_xxx`처럼 짧게 바꿈.
 
@@ -33,10 +35,12 @@ task4_ble/dongle_central/build.sh
 
 ## 사용
 
-동글을 꽂으면 가상 COM이 생긴다. 터미널로 열면 XIAO가 보내는 `<seq>,<millis>` 줄이 그대로 나온다. 에코 입력은 반대로 XIAO로 간다.
+동글을 꽂으면 가상 COM이 생긴다. 터미널로 열면 XIAO가 보내는 `<seq>,<millis>` 줄이 그대로 나온다. 에코 입력은 반대로 XIAO로 간다. RSSI 버전은 같은 포트에 `RSSI,...`와 `STATE,...` 줄도 1초마다 낸다.
+
+주의: 포트를 아무도 읽지 않는 동안 동글은 데이터를 쌓다가 힙이 차면 버리고, 포트를 다시 열면 쌓인 오래된 데이터가 먼저 나온다. 측정 스크립트(`measure/distance.py`)는 이 때문에 포트를 계속 읽는다.
 
 ## 확인 결과 (Task 4 Lv1)
 
 - 동글 COM 포트 `VID_2FE3&PID_0100`, XIAO1 연결 후 `seq,millis` 줄 수신 (약 100 ms 간격).
-- 15초 수신 로그: [`../data/t4_lv1_dongle_rx_15s.csv`](../data/t4_lv1_dongle_rx_15s.csv) (148행, seq 끊김 0, 간격 50–150 ms).
+- 15초 수신 로그: [`../data/lv1/pc_rx/t4_lv1_dongle_rx_15s.csv`](../data/lv1/pc_rx/t4_lv1_dongle_rx_15s.csv) (148행, seq 끊김 0, 간격 50–150 ms).
 - 확인 안 됨: RC(`K32SRC_RC`) 사용 조건에서 BLE 장시간 안정성, 연결 끊김 후 재연결 시간.
