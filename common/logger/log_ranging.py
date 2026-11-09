@@ -7,7 +7,7 @@ INITF는 다른 터미널에서 직접 실행하거나, 이 스크립트를 먼�
 단, Tera Term 같은 프로그램이 같은 COM 포트를 열고 있으면 이 스크립트가 포트를 열 수 없다.
 
 -n은 저장할 레인징 시도 횟수다. 성공이든 실패(RX_TIMEOUT 등, 거리 없음)든 한 번이면 한 줄이다.
-같은 이름의 출력 파일이 이미 있으면 덮어쓰지 않고 멈춘다.
+같은 이름의 출력 파일이 이미 있으면 덮어쓰지 않고 멈춘다. 덮어쓰려면 --force를 붙인다.
 """
 import argparse
 import csv
@@ -20,7 +20,7 @@ import serial
 SEQ = re.compile(r'sequence_number=(\d+)')
 MAC = re.compile(r'mac_address=(0x[0-9a-fA-F]+)')
 STATUS = re.compile(r'status="(\w+)"')
-DIST = re.compile(r'distance\[cm\]=(\d+)')
+DIST = re.compile(r'distance\[cm\]=(-?\d+)')  # NLOS나 가림에서는 음수 거리도 나온다
 
 
 def parse(buffer):
@@ -52,14 +52,15 @@ def main():
     ap.add_argument('port')
     ap.add_argument('out')
     ap.add_argument('-n', type=int, default=300, help='저장할 레인징 시도 횟수(성공과 실패 모두)')
+    ap.add_argument('--force', action='store_true', help='같은 이름의 파일이 있어도 덮어쓴다')
     args = ap.parse_args()
 
-    if os.path.exists(args.out):
-        raise SystemExit(f'{args.out}이(가) 이미 있다. 다른 이름을 쓴다.')
+    if os.path.exists(args.out) and not args.force:
+        raise SystemExit(f'{args.out}이(가) 이미 있다. 다른 이름을 쓰거나 덮어쓰려면 --force를 붙인다.')
 
-    # 포트를 먼저 연다. 포트 오류로 멈췄을 때 빈 CSV가 남지 않게 한다.
+    # 포트를 먼저 연다. 포트 오류로 멈췄을 때 기존 파일이나 빈 CSV가 건드려지지 않게 한다.
     ser = serial.Serial(args.port, 115200, timeout=0.2)
-    f = open(args.out, 'x', newline='', encoding='utf-8')
+    f = open(args.out, 'w' if args.force else 'x', newline='', encoding='utf-8')
     buf = ''
     count = 0
     ok = 0
