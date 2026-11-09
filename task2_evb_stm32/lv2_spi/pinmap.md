@@ -127,13 +127,13 @@ EVB는 Arduino 실드라서 **Nucleo의 Arduino 헤더에 직접 꽂는 구성**
 - [x] 회로도로 EVB 쪽 신호와 J1 기능 확인 (Qorvo DWS3000 회로도 V1.2)
 - [x] ST 매뉴얼 표로 N6 Arduino 핀 확인, 디지털 I/O 3.3 V 확인 (UM3417 사본)
 - [x] J1 점퍼 위치 확인: 1-2 (`3V3_DCDC`)로 보임 (`docs/evb_j1_closeup.jpg`). 사진 판독이므로 전원 전에 한 번 더 눈으로 확인
-- [x] DC-DC 상태에서 EVB의 `LED1`이 켜지고 정상 동작함 (보드 2). `5V` 핀 전압과 전류 여유를 측정하지는 않았다
-- [x] EVB를 Nucleo의 Arduino 헤더에 올렸을 때 정렬 확인 (사용자 확인, 전원 끈 상태) 후 장착: `docs/evb_on_nucleo_board2.jpg`
+- [x] DC-DC 상태에서 EVB의 `LED1`이 켜지고 정상 동작함 (보드 1). `5V` 핀 전압과 전류 여유를 측정하지는 않았다
+- [x] EVB를 Nucleo의 Arduino 헤더에 올렸을 때 정렬 확인 (사용자 확인, 전원 끈 상태) 후 장착: `docs/evb_on_nucleo_board1.jpg`
 - [x] D4, D3, D1, D0에 해당하는 N6 핀(PE0, PE9, PD8, PD9)은 `uwb_port.c`가 설정하지 않는다 (코드 확인)
-- [x] SPI5 핀 기능: ST 예제 `SPI_FullDuplex`가 PE15, PG1, PG2를 AF5로 쓰고, 보드 2에서 SCK와 MISO가 동작함
+- [x] SPI5 핀 기능: ST 예제 `SPI_FullDuplex`가 PE15, PG1, PG2를 AF5로 쓰고, 보드 1에서 SCK와 MISO가 동작함
 - [ ] 회로도(V1.2)와 실물(`Module shield v1.3`)의 차이 여부를 가능하면 Qorvo Quick Start Guide 등으로 확인
-- [x] 전원 인가, Device ID 읽기 `0xDECA0302` 20/20, 로그 저장 (`logs/device_id_board2.txt`)
-- [x] **MOSI(PG2, D11) 검증됨**: 쓰기-읽기 시험 3회 실행 모두 20/20 PASS (`logs/device_id_mosi_board2_run1~3.txt`). 참고로 Device ID 읽기만으로는 검증되지 않아 별도 시험을 했다. 원래 문구:: Device ID 읽기는 보내는 바이트가 모두 0이라 MOSI가 눌려 있어도 성공한다. 0이 아닌 값을 보내는 시험이 필요하다
+- [x] 전원 인가, Device ID 읽기 `0xDECA0302` 20/20, 로그 저장 (`logs/device_id_board1.txt`)
+- [x] **MOSI(PG2, D11) 검증됨**: 쓰기-읽기 시험 3회 실행 모두 20/20 PASS (`logs/device_id_mosi_board1_run1~3.txt`). 참고로 Device ID 읽기만으로는 검증되지 않아 별도 시험을 했다. 원래 문구:: Device ID 읽기는 보내는 바이트가 모두 0이라 MOSI가 눌려 있어도 성공한다. 0이 아닌 값을 보내는 시험이 필요하다
 - [x] 전원 재투입(USB 재연결) 반복 2회: 같은 결과
-- [ ] 보드 1에서의 시험
+- [ ] 보드 2에서의 시험
 - [ ] IRQ 핀이 처음부터 High로 읽힌 이유 확인 (`SYS_STATUS` 플래그 가능성)
