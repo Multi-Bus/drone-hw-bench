@@ -6,6 +6,7 @@
 #define UWB_ADAPTER_DW3000_HW_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 int  dw3000_hw_init(void);              // pins + SPI, waits until the chip released RSTn (up to 1 s)
 int  dw3000_hw_init_interrupt(void);    // IRQ pin as a rising-edge interrupt (EXTI12) and enables it
@@ -24,6 +25,18 @@ extern void (*dw3000_hw_isr_hook)(void);
 // Calls the hook while the IRQ pin is high (at most DW3000_HW_ISR_MAX_LOOPS times). Called by the interrupt
 // handler; can also be called from the main loop. Does nothing while no hook is set.
 void dw3000_hw_irq_poll(void);
+
+// Counters for checking the interrupt path (reset them by writing zeros).
+typedef struct {
+  volatile uint32_t isr_entries;        // times EXTI12_IRQHandler ran
+  volatile uint32_t max_depth;          // deepest nesting of EXTI12_IRQHandler (1 = never re-entered)
+  volatile uint32_t hook_calls;         // calls of dw3000_hw_isr_hook (the driver's dwt_isr)
+  volatile uint32_t loop_limit_hits;    // IRQ still high after DW3000_HW_ISR_MAX_LOOPS calls
+  volatile uint32_t last_isr_cycles;    // CPU cycles of the last dw3000_hw_irq_poll()
+  volatile uint32_t max_isr_cycles;
+} dw3000_hw_stats_t;
+
+extern dw3000_hw_stats_t dw3000_hw_stats;
 #define DW3000_HW_ISR_MAX_LOOPS 8
 
 #endif

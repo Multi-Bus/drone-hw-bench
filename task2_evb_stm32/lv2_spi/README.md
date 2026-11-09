@@ -57,21 +57,21 @@ int uwb_spi_write(uint16_t header_len, const uint8_t *header, uint16_t body_len,
 
 ## DW3000 드라이버 어댑터 (br101/dw3000-decadriver-source v08.02.02)
 
-TWR 담당자가 쓰는 드라이버의 platform 인터페이스(`platform/dw3000_spi.h`, `dw3000_hw.h`, `nrf-sdk/deca_port.c`, 2026-11-09에 읽음)와 **같은 함수 시그니처**로 `uwb_port` 위에 얇게 만들었다. 컴파일과 링크는 확인했고(사용하지 않는 함수까지 검사), **보드 시험은 아직이다.**
+TWR 담당자가 쓰는 드라이버의 platform 인터페이스(`platform/dw3000_spi.h`, `dw3000_hw.h`, `nrf-sdk/deca_port.c`, 2026-11-09에 읽음)와 **같은 함수 시그니처**로 `uwb_port` 위에 얇게 만들었다. 컴파일과 링크를 확인했고, `dw3000_hw`/`deca_port`/인터럽트 경로는 드라이버와 함께 **보드 1에서 시험했다** (아래 "드라이버 + 인터럽트 시험"). `speed_fast`(8 MHz), `write_crc`, 실제 `wakeup`은 **시험 전**이다.
 
 | 파일 | 함수 | 상태 |
 | --- | --- | --- |
 | `dw3000_spi.c/.h` | `init`, `fini`, `wakeup`, `speed_slow`, `speed_fast`, `read`, `write`, `write_crc`, `trace_output` | 작성. `read`/`write`(2 MHz)는 `uwb_port`로 보드에서 시험됨. `write_crc`, `wakeup`, `speed_fast`는 시험 전. 반환값은 성공 0, 실패 -1 (Qorvo `DWT_SUCCESS`/`DWT_ERROR` 관례, 드라이버 헤더로 확인 필요) |
 | `dw3000_hw.c/.h` | `init`, `init_interrupt`, `fini`, `reset`, `wakeup`, `wakeup_pin_low`, `interrupt_enable/disable/is_enabled` | 작성. `reset`은 시험됨 (`uwb_port_reset`). 나머지 시험 전 |
-| 인터럽트 분배 | EXTI12(PD12) 상승 에지 → `dw3000_hw_irq_poll()` → `dw3000_hw_isr_hook` (드라이버의 `dwt_isr()`를 연결하는 자리). 켤 때 IRQ가 이미 High면 한 번 소프트웨어로 걸어 줌 | 작성, 시험 전. IRQ 핀이 High인 동안 호출하되 최대 8번으로 제한했다 (참고 포팅은 High인 동안 무한 반복이라, IRQ가 계속 High면 핸들러에서 못 빠져나올 수 있다) |
-
+| 인터럽트 분배 | EXTI12(PD12) 상승 에지 → `dw3000_hw_irq_poll()` → `dw3000_hw_isr_hook` (드라이버의 `dwt_isr()`를 연결하는 자리). 켤 때 IRQ가 이미 High면 한 번 소프트웨어로 걸어 줌 | 작성, **보드 1에서 시험됨.** IRQ 핀이 High인 동안 호출하되 최대 8번으로 제한했다 (참고 포팅은 High인 동안 무한 반복이라, IRQ가 계속 High면 핸들러에서 못 빠져나올 수 있다). 시험에서 제한에 걸린 적은 없다 |
 | `deca_port.c` | `wakeup_device_with_io`, `decamutexon/off`, `deca_sleep`, `deca_usleep`, 프로브 구조체 `dw3000_probe_interf` (`dwt_probe`용) | 작성. **드라이버 헤더가 필요해서 CubeIDE 프로젝트에는 연결하지 않았다** (`.project`에 없음). 드라이버를 프로젝트에 넣을 때 이 파일을 추가한다 |
 
 **드라이버와의 확인 (2026-11-09, `br101/dw3000-decadriver-source` 커밋 `67dfbb7`, `DRIVER_VERSION_HEX = 0x080202`):** 공개 저장소를 로컬에 받아서(repo에는 넣지 않음, 라이선스 혼재) 확인했다.
 
 - `deca_port.c`는 그 저장소의 실제 헤더(`deca_interface.h`, `deca_device_api.h`)로 **경고 없이 컴파일된다.**
 - 드라이버 소스(`deca_interface.c`, `deca_rsl.c`, `dw3000/dw3000_device.c`)와 우리 어댑터를 함께 링크하면 **플랫폼 쪽 미해결 심볼이 없다.** 남은 미해결 3개(`dwt_generatecrc8`, `dwt_aon_read`, `log2_lut`)는 모두 드라이버 쪽 파일(`deca_compat.c`, `lib/qmath`)에서 온다.
-- **드라이버 쪽 문제 (우리 코드 아님):** 이 저장소 커밋에서 `deca_compat.c`가 컴파일되지 않는다 (`const struct dwt_ops_s has no member named 'ioctl'`). `deca_interface.h`에서 `ioctl` 멤버가 주석 처리돼 있는데 `deca_compat.c`는 `->ioctl`을 부른다. 통합할 때 만나면 이 때문이다.
+- **정정 (2026-11-09):** 이 줄의 이전 버전은 "`deca_compat.c`가 `ioctl` 때문에 컴파일되지 않는다, 드라이버 쪽 문제"라고 적었으나 **틀렸다.** `dwt_uwb_driver/deca_compat.c`(구버전)를 컴파일했기 때문이고, 이 저장소에서 쓰는 파일은 **`platform/deca_compat.c`**다. 올바른 파일로는 `ioctl` 오류 없이 컴파일된다. 빌드에는 `-DUSE_DRV_DW3000 -DCONFIG_DW3000_CHIP_DW3000=1`이 필요하다.
+- **링크 오류 (드라이버 쪽, 직접 확인):** `platform/deca_compat.c`와 `dw3000/dw3000_device.c`를 같이 링크하면 `ull_dis_otp_ips`, `ull_run_pgfcal`, `ull_setplenfine`, `ull_setstslength`가 미해결이다. `dw3000_device.c`가 이 네 함수를 `static`으로 선언하는데 `deca_compat.c`는 밖에서 부른다 (`dw3720_device.c`는 `static` 없이 내보낸다). 우회: 선언 네 줄에서 `static`을 뺀다 ([`T2_UWB_ISR/driver_patches/`](T2_UWB_ISR/driver_patches/), 드라이버 소스 자체는 repo에 넣지 않음). upstream 쪽 수정이나 이슈는 내지 않았다.
 - `deca_sleep()`은 일부러 DWT 사이클 카운터 기반 busy wait로 만들었다. `HAL_Delay()`를 쓰면 드라이버의 인터럽트 서비스(우선순위가 SysTick보다 높음) 안에서 불렸을 때 반환하지 못한다. 대신 긴 sleep 동안 CPU를 점유한다.
 - libdeca 쪽이 플랫폼에 요구하는 것(`log.h`, `dwmac_task.h` 등)은 확인하지 않았다.
 
@@ -92,9 +92,29 @@ TWR 담당자가 쓰는 드라이버의 platform 인터페이스(`platform/dw300
 
 **조심할 점 (어댑터에 반영함):**
 
-- **IRQ가 이미 High인 상태에서 상승 에지 인터럽트를 켜면 에지가 없어서 인터럽트가 걸리지 않는다.** 그래서 `dw3000_hw_init_interrupt()`는 켠 뒤 핀이 High이면 인터럽트를 한 번 소프트웨어로 걸어(`NVIC_SetPendingIRQ`) 핸들러가 `SPIRDY`를 처리하게 한다. 이 경로는 컴파일과 링크만 확인했고 보드 시험 전이다.
+- **IRQ가 이미 High인 상태에서 상승 에지 인터럽트를 켜면 에지가 없어서 인터럽트가 걸리지 않는다.** 그래서 `dw3000_hw_init_interrupt()`는 켠 뒤 핀이 High이면 인터럽트를 한 번 소프트웨어로 걸어(`NVIC_SetPendingIRQ`) 핸들러가 `SPIRDY`를 처리하게 한다. 이 경로는 보드 1에서 시험했다 (아래 "드라이버 + 인터럽트 시험").
 - 참고 포팅의 핸들러는 IRQ가 High인 동안 `dwt_isr()`를 반복해서 부른다. 처리되지 않는 이벤트가 있어 IRQ가 계속 High면 빠져나오지 못하므로 우리는 반복을 8번으로 제한했다.
 - `SYS_STATUS`의 `SPICRCE`(비트 2, SPI CRC 오류 상태)가 리셋 직후부터 1이다. 인터럽트에 허용돼 있지 않아 IRQ에는 영향이 없고, 어디서 오는 값인지는 확인하지 못했다 (SPI CRC 검사는 켜지 않았다). 읽기만 했고 지우지 않았다.
+
+## 드라이버 + 인터럽트 시험 (`T2_UWB_ISR/`, 보드 1, 2026-11-09)
+
+어댑터를 실제 br101 드라이버(v08.02.02, 커밋 `67dfbb7`)와 연결해서 `dwt_isr()`가 EXTI12 인터럽트로 불리는지 확인했다. 프로젝트와 준비 방법은 [`T2_UWB_ISR/README.md`](T2_UWB_ISR/README.md), 원본 로그는 [`logs/t2_lv2_isr_board1.txt`](logs/t2_lv2_isr_board1.txt) (보드 1, Tera Term은 COM5. 로그 파일에는 COM 번호가 없다).
+
+| 항목 | 결과 |
+| --- | --- |
+| `DWT_SUCCESS` / `DWT_ERROR` | `0` / `-1` (어댑터 반환값 관례와 일치) |
+| `dwt_probe()` | 0 (DW3000 드라이버 선택됨) |
+| `dwt_initialise(DWT_DW_INIT)` | 0 (성공). 끝난 뒤 SPI 속도는 2 MHz 그대로 |
+| `dwt_readdevid()` (초기화 뒤) | `0xDECA0302` |
+| A) IRQ가 이미 High인 상태에서 인터럽트 켬 (소프트웨어 pending 경로) | 핸들러 진입 1회, `dwt_isr` 호출 1회, `SPIRDY` 콜백 1회, 이후 `IRQ=0`, `SYS_STATUS=0x00000004`. **PASS** |
+| B) 인터럽트를 켠 채 하드웨어 리셋 20회 (실제 상승 에지) | 20/20에서 리셋당 핸들러 진입 1회, `dwt_isr` 1회, `SPIRDY` 콜백 1회, `IRQ=0`. 반복 제한(8회)에 걸린 적 0회. **PASS** |
+| ISR 시간 | 약 51,000 사이클, 최대 51,092 (≈ 85 µs). `dwt_isr`이 2 MHz SPI로 상태 읽기·지우기를 하는 시간이 대부분일 것으로 보이나 구간별로 나눠 재지는 않았다 |
+
+**EXTI 재진입에 대해:** 핸들러 중첩 깊이는 최대 1이었다. 다만 Cortex-M에서는 같은 인터럽트가 자기 자신을 선점할 수 없어서 깊이 1은 구조상 거의 보장된다. 실질적인 확인은 "리셋 한 번에 핸들러가 정확히 한 번 불리고 IRQ가 내려간다"는 점이고, 이것은 21번(A 1회 + B 20회) 모두 맞았다. IRQ가 계속 High로 남는 경우는 관찰되지 않았다.
+
+**시험 중 찾은 함정 (드라이버 쪽):** `dwt_initialise()`가 `dw->priv`를 처음 설정한다 (`dw3000_device.c:1016`). 그 전에 `dwt_readdevid()`나 `dwt_checkidlerc()` 같은 레지스터 읽기 함수를 부르면 NULL 포인터를 읽는다 (읽기 경로가 `LOCAL_DATA(dw)->spicrc`를 읽음). 실제로 첫 시도에서 `dwt_probe` 출력 뒤에 멈췄다. NULL 접근이 원인이라는 것은 코드를 읽고 추정한 것이고, 디버거로 HardFault를 직접 확인하지는 않았다 (순서를 고친 뒤에는 정상 동작). `dwt_initialise()` 전에 칩 상태를 보려면 드라이버 대신 직접 SPI로 읽는다 (이 시험은 `SYS_STATUS` 비트 24를 `uwb_port_read_status()`로 읽는다).
+
+**여전히 시험 전:** `dw3000_spi_speed_fast` (8 MHz), 실제 `wakeup` (슬립에서 깨우기. `dwt_probe`가 `wakeup_device_with_io`를 한 번 부르지만 칩이 슬립 상태가 아니라서 깨우기가 실제로 동작하는지는 확인되지 않았다), `dw3000_spi_write_crc`, 보드 2. TWR(라이브러리 `libdeca`) 초기화 순서와 이벤트 처리는 이 시험 범위가 아니다. 한 번의 전원 투입에서 얻은 결과이고, 재현(USB 재연결 후 반복)은 하지 않았다.
 
 ## 실행 방법
 

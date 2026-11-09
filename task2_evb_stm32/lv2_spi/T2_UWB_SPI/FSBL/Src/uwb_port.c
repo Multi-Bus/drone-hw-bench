@@ -371,3 +371,11 @@ int uwb_port_irq_diag(uwb_irq_diag_t *d)
   d->irq_after = uwb_port_irq_level();
   return UWB_OK;
 }
+
+int uwb_port_read_status(uint32_t *sys_status, uint32_t *sys_enable_lo)
+{
+  if (reg_read32(DW_SYS_STATUS, sys_status) != UWB_OK || reg_read32(DW_SYS_ENABLE_LO, sys_enable_lo) != UWB_OK) {
+    return UWB_ERROR;
+  }
+  return UWB_OK;
+}

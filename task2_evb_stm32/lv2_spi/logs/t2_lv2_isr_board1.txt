@@ -1,0 +1,44 @@
+
+== T2 Lv2: DW3000 driver + interrupt test (dwt_isr, SPIRDY, EXTI12) ==
+DW3XXX Device Driver Version 08.02.02
+DWT_SUCCESS=0 DWT_ERROR=-1 (the adapters return 0 on success and -1 on error)
+dw3000_hw_init: 0 (0 = RSTn released within 1 s)
+dwt_probe: 0 (DWT_SUCCESS = 0)
+RCINIT (SYS_STATUS bit24) = 1 after 0 ms
+dwt_initialise: 0 (DWT_SUCCESS = 0), SPI clock now 2000000 Hz
+dwt_readdevid: 0xDECA0302  OK
+dwt_checkidlerc: 1
+after dwt_initialise: IRQ=1 STATUS=0x01800005 ENABLE_LO=0x00800000
+
+-- A) interrupt enabled while IRQ is already high (software pending path)
+before enabling: IRQ=1 STATUS=0x01800005 ENABLE_LO=0x00800000
+after enabling : IRQ=0 STATUS=0x00000004 ENABLE_LO=0x00800000
+handler entries=1, dwt_isr calls=1, SPIRDY callbacks=1 (STATUS in callback 0x01800005), max depth=1, ISR 51975 cycles
+A: PASS
+
+-- B) real rising edge: hardware reset with the interrupt enabled, 20 times
+#01 entries+1 isr+1 SPIRDY+1 IRQ=0 STATUS=0x00000004 ISR=51092 cycles  OK
+#02 entries+1 isr+1 SPIRDY+1 IRQ=0 STATUS=0x00000004 ISR=50996 cycles  OK
+#03 entries+1 isr+1 SPIRDY+1 IRQ=0 STATUS=0x00000004 ISR=50948 cycles  OK
+#04 entries+1 isr+1 SPIRDY+1 IRQ=0 STATUS=0x00000004 ISR=50996 cycles  OK
+#05 entries+1 isr+1 SPIRDY+1 IRQ=0 STATUS=0x00000004 ISR=50930 cycles  OK
+#06 entries+1 isr+1 SPIRDY+1 IRQ=0 STATUS=0x00000004 ISR=50912 cycles  OK
+#07 entries+1 isr+1 SPIRDY+1 IRQ=0 STATUS=0x00000004 ISR=50990 cycles  OK
+#08 entries+1 isr+1 SPIRDY+1 IRQ=0 STATUS=0x00000004 ISR=50966 cycles  OK
+#09 entries+1 isr+1 SPIRDY+1 IRQ=0 STATUS=0x00000004 ISR=50936 cycles  OK
+#10 entries+1 isr+1 SPIRDY+1 IRQ=0 STATUS=0x00000004 ISR=50954 cycles  OK
+#11 entries+1 isr+1 SPIRDY+1 IRQ=0 STATUS=0x00000004 ISR=50990 cycles  OK
+#12 entries+1 isr+1 SPIRDY+1 IRQ=0 STATUS=0x00000004 ISR=50978 cycles  OK
+#13 entries+1 isr+1 SPIRDY+1 IRQ=0 STATUS=0x00000004 ISR=51056 cycles  OK
+#14 entries+1 isr+1 SPIRDY+1 IRQ=0 STATUS=0x00000004 ISR=50996 cycles  OK
+#15 entries+1 isr+1 SPIRDY+1 IRQ=0 STATUS=0x00000004 ISR=50971 cycles  OK
+#16 entries+1 isr+1 SPIRDY+1 IRQ=0 STATUS=0x00000004 ISR=51020 cycles  OK
+#17 entries+1 isr+1 SPIRDY+1 IRQ=0 STATUS=0x00000004 ISR=50900 cycles  OK
+#18 entries+1 isr+1 SPIRDY+1 IRQ=0 STATUS=0x00000004 ISR=50954 cycles  OK
+#19 entries+1 isr+1 SPIRDY+1 IRQ=0 STATUS=0x00000004 ISR=50943 cycles  OK
+#20 entries+1 isr+1 SPIRDY+1 IRQ=0 STATUS=0x00000004 ISR=50943 cycles  OK
+B: 20/20 resets handled (one SPIRDY callback, IRQ low). Max handler entries per reset=1, max depth=1, loop limit hits=0, longest ISR=51092 cycles (85 us)
+B: PASS
+
+verdict: PASS
+== done ==

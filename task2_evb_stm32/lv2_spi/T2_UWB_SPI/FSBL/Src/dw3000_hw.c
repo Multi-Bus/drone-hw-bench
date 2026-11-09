@@ -9,6 +9,8 @@
 #define IRQ_PIN_     GPIO_PIN_12     // D8, EXTI line 12
 
 void (*dw3000_hw_isr_hook)(void);
+dw3000_hw_stats_t dw3000_hw_stats;
+static volatile uint32_t handler_depth;
 
 int dw3000_hw_init(void)
 {
@@ -101,15 +103,32 @@ void dw3000_hw_irq_poll(void)
   if (dw3000_hw_isr_hook == 0) {
     return;
   }
+  uint32_t t0 = DWT->CYCCNT;
   // The reference ports call the driver's interrupt service while the IRQ pin stays high. The loop is limited
   // so that an IRQ pin that stays high (unserviced status bits) cannot lock up the interrupt handler.
-  for (int i = 0; i < DW3000_HW_ISR_MAX_LOOPS && uwb_port_irq_level(); i++) {
+  int i = 0;
+  for (; i < DW3000_HW_ISR_MAX_LOOPS && uwb_port_irq_level(); i++) {
+    dw3000_hw_stats.hook_calls++;
     dw3000_hw_isr_hook();
+  }
+  if (i == DW3000_HW_ISR_MAX_LOOPS && uwb_port_irq_level()) {
+    dw3000_hw_stats.loop_limit_hits++;
+  }
+  uint32_t dt = DWT->CYCCNT - t0;
+  dw3000_hw_stats.last_isr_cycles = dt;
+  if (dt > dw3000_hw_stats.max_isr_cycles) {
+    dw3000_hw_stats.max_isr_cycles = dt;
   }
 }
 
 void EXTI12_IRQHandler(void)
 {
+  uint32_t depth = ++handler_depth;
+  dw3000_hw_stats.isr_entries++;
+  if (depth > dw3000_hw_stats.max_depth) {
+    dw3000_hw_stats.max_depth = depth;
+  }
   HAL_GPIO_EXTI_IRQHandler(IRQ_PIN_);   // clears the EXTI flag
   dw3000_hw_irq_poll();                  // also runs when the interrupt was only pended by software
+  handler_depth--;
 }

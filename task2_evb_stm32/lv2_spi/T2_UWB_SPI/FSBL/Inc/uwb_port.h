@@ -83,4 +83,7 @@ typedef struct {
 
 int uwb_port_irq_diag(uwb_irq_diag_t *d);
 
+// Read-only: SYS_STATUS (0x44) and SYS_ENABLE_LO (0x3C). Changes nothing in the chip.
+int uwb_port_read_status(uint32_t *sys_status, uint32_t *sys_enable_lo);
+
 #endif
