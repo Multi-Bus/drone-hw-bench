@@ -238,6 +238,27 @@ int main(void)
   printf("MOSI result: %lu/%lu rounds OK, %lu SPI errors\r\n",
          (unsigned long)mosi_pass, (unsigned long)mosi_rounds, (unsigned long)mosi_err);
   printf("MOSI verdict: %s\r\n", (mosi_pass == mosi_rounds) ? "PASS" : "FAIL");
+
+  /* IRQ diagnosis: why does the IRQ pin read High after power-up? Read SYS_STATUS / SYS_ENABLE, clear the
+     start-up events (SPIRDY, RCINIT) and look at the pin again. Three rounds, each after a reset. */
+  printf("\r\n== IRQ diagnosis (after a reset): SYS_STATUS / SYS_ENABLE ==\r\n");
+  for (uint32_t n = 1; n <= 3; n++)
+  {
+    uwb_irq_diag_t d;
+    uwb_port_reset();
+    if (uwb_port_irq_diag(&d) != UWB_OK)
+    {
+      printf("#%lu SPI ERROR\r\n", (unsigned long)n);
+      continue;
+    }
+    printf("#%lu RSTn=%d IRQ=%d STATUS=0x%08lX (IRQS=%lu RCINIT=%lu SPIRDY=%lu) ENABLE_LO=0x%08lX ENABLE_HI=0x%08lX\r\n",
+           (unsigned long)n, d.rst_level, d.irq_before, (unsigned long)d.status_before,
+           (unsigned long)(d.status_before & 1UL), (unsigned long)((d.status_before >> 24) & 1UL),
+           (unsigned long)((d.status_before >> 23) & 1UL), (unsigned long)d.enable_lo, (unsigned long)d.enable_hi);
+    printf("   cleared 0x%08lX -> STATUS=0x%08lX IRQ=%d\r\n",
+           (unsigned long)d.cleared_mask, (unsigned long)d.status_after, d.irq_after);
+    HAL_Delay(100);
+  }
   printf("== done ==\r\n");
   /* USER CODE END 2 */
 

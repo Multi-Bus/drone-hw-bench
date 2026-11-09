@@ -53,6 +53,22 @@ int uwb_spi_write(uint16_t header_len, const uint8_t *header, uint16_t body_len,
 - SPI5 커널 클럭은 HSI 64 MHz이고 프리스케일러 32 / 8로 2 MHz / 8 MHz를 만든다. Qorvo 소스 주석 기준으로 `dwt_softreset` 전에는 7 MHz 이하, 초기화(`dwt_initialise`)는 3 MHz 미만이어야 하므로 **초기화가 끝나기 전에는 `uwb_port_spi_slow()`** 를 쓴다 (사본 소스 기준, 사용할 Qorvo SDK 버전에서 확인).
 - Qorvo 드라이버가 요구하는 다른 함수(`deca_sleep`, 인터럽트 콜백 등)는 아직 연결하지 않았다. TWR 담당자와 SDK 버전을 맞춘 뒤 어댑터를 쓴다.
 
+## DW3000 드라이버 어댑터 (br101/dw3000-decadriver-source v08.02.02)
+
+TWR 담당자가 쓰는 드라이버의 platform 인터페이스(`platform/dw3000_spi.h`, `dw3000_hw.h`, 2026-11-09에 읽음)와 **같은 함수 시그니처**로 `uwb_port` 위에 얇게 만들었다. 컴파일과 링크는 확인했고(사용하지 않는 함수까지 검사), **보드 시험은 아직이다.**
+
+| 파일 | 함수 | 상태 |
+| --- | --- | --- |
+| `dw3000_spi.c/.h` | `init`, `fini`, `wakeup`, `speed_slow`, `speed_fast`, `read`, `write`, `write_crc`, `trace_output` | 작성. `read`/`write`(2 MHz)는 `uwb_port`로 보드에서 시험됨. `write_crc`, `wakeup`, `speed_fast`는 시험 전. 반환값은 성공 0, 실패 -1 (Qorvo `DWT_SUCCESS`/`DWT_ERROR` 관례, 드라이버 헤더로 확인 필요) |
+| `dw3000_hw.c/.h` | `init`, `init_interrupt`, `fini`, `reset`, `wakeup`, `wakeup_pin_low`, `interrupt_enable/disable/is_enabled` | 작성. `reset`은 시험됨 (`uwb_port_reset`). 나머지 시험 전 |
+| 인터럽트 분배 | EXTI12(PD12) 상승 에지 → `dw3000_hw_isr_hook` (드라이버의 `dwt_isr()`를 연결하는 자리) | 작성, 시험 전. IRQ 핀이 High인 동안 호출하되 최대 8번으로 제한했다 (참고 포팅은 High인 동안 무한 반복이라, IRQ가 계속 High면 핸들러에서 못 빠져나올 수 있다) |
+
+**아직 없는 것 (드라이버 소스의 헤더가 필요):** `deca_sleep`/`deca_usleep`, `decamutexon`/`decamutexoff`, `dwt_probe` 인터페이스 구조체 (`dw3000_probe_interf`). 이 함수들은 드라이버 헤더의 타입(`decaIrqStatus_t`, `struct dwt_probe_s`)에 의존해서 드라이버 없이는 컴파일 확인을 할 수 없다. 이미 있는 부품: 마이크로초 지연 `uwb_port_delay_us()`, 밀리초 지연 `uwb_port_sleep_ms()`, 인터럽트 끄고 켜기 `dw3000_hw_interrupt_disable/enable()`.
+
+### IRQ 핀이 High인 이유 (진단 코드 추가, 보드 시험 전)
+
+`main.c`의 마지막 단계가 리셋 직후 `SYS_STATUS`(0x44), `SYS_ENABLE_LO`(0x3C), `SYS_ENABLE_HI`(0x40)를 읽고, 시작 이벤트(`SPIRDY` 비트 23, `RCINIT` 비트 24)만 지운 뒤 IRQ 핀을 다시 읽는다 (`uwb_port_irq_diag()`). 지운 뒤 IRQ가 내려가면 켜진 직후의 이벤트가 인터럽트를 올리고 있었다는 뜻이다. 결과는 보드에서 실행한 뒤 추가한다.
+
 ## 실행 방법
 
 1. **전원을 끈 상태**(USB 뽑음)에서 EVB를 Nucleo의 Arduino 헤더에 꽂는다 (J1 점퍼는 그대로). 꽂은 사진을 `docs/`에 남긴다.

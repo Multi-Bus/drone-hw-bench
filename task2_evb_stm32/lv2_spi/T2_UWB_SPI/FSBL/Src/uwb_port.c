@@ -19,6 +19,7 @@
 
 static SPI_HandleTypeDef hspi5;
 static uint32_t spi_divider = 32U;
+static int port_ready;   // uwb_port_init() already done
 static uint8_t tx_buf[UWB_SPI_MAX_FRAME];
 static uint8_t rx_buf[UWB_SPI_MAX_FRAME];
 
@@ -81,6 +82,13 @@ static int spi5_start(uint32_t prescaler, uint32_t divider)
 
 int uwb_port_init(void)
 {
+  if (port_ready) {
+    return UWB_OK;   // safe to call from several places
+  }
+  // cycle counter for the microsecond delay
+  DCB->DEMCR |= DCB_DEMCR_TRCENA_Msk;
+  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOE_CLK_ENABLE();
@@ -110,7 +118,9 @@ int uwb_port_init(void)
   gpio.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(IRQ_PORT, &gpio);
 
-  return spi5_start(SPI_PRESC_SLOW, 32U);
+  int rc = spi5_start(SPI_PRESC_SLOW, 32U);
+  port_ready = (rc == UWB_OK);
+  return rc;
 }
 
 void uwb_port_spi_slow(void)
@@ -257,5 +267,107 @@ int uwb_port_mosi_selftest(uwb_mosi_result_t *r)
   if (panadr_write(r->panadr_orig) != UWB_OK || panadr_read(&r->restored_value) != UWB_OK) {
     return UWB_ERROR;
   }
+  return UWB_OK;
+}
+
+// ---- additions for the DW3000 driver adapter (dw3000_spi.c, dw3000_hw.c) -------------------------
+void uwb_port_delay_us(uint32_t us)
+{
+  uint32_t ticks = us * (SystemCoreClock / 1000000U);
+  uint32_t start = DWT->CYCCNT;
+  while ((DWT->CYCCNT - start) < ticks) {
+  }
+}
+
+int uwb_port_rst_is_high(void)
+{
+  return (HAL_GPIO_ReadPin(RST_PORT, RST_PIN) == GPIO_PIN_SET) ? 1 : 0;
+}
+
+void uwb_port_cs_wakeup(void)
+{
+  HAL_GPIO_WritePin(CS_PORT, CS_PIN, GPIO_PIN_RESET);   // wake the chip with a long CS low pulse
+  uwb_port_delay_us(500);
+  HAL_GPIO_WritePin(CS_PORT, CS_PIN, GPIO_PIN_SET);
+  HAL_Delay(1);
+}
+
+void uwb_port_spi_deinit(void)
+{
+  (void)HAL_SPI_DeInit(&hspi5);
+  port_ready = 0;
+}
+
+// Same as uwb_spi_write() but one more byte (a CRC-8 supplied by the driver) follows the body in the same frame.
+int uwb_spi_write_crc(uint16_t header_len, const uint8_t *header, uint16_t body_len, const uint8_t *body, uint8_t crc8)
+{
+  uint32_t total = (uint32_t)header_len + body_len + 1U;
+  if (total > UWB_SPI_MAX_FRAME) {
+    return UWB_ERROR;
+  }
+  memcpy(tx_buf, header, header_len);
+  memcpy(tx_buf + header_len, body, body_len);
+  tx_buf[header_len + body_len] = crc8;
+
+  HAL_GPIO_WritePin(CS_PORT, CS_PIN, GPIO_PIN_RESET);
+  HAL_StatusTypeDef st = HAL_SPI_Transmit(&hspi5, tx_buf, (uint16_t)total, 100);
+  HAL_GPIO_WritePin(CS_PORT, CS_PIN, GPIO_PIN_SET);
+  return (st == HAL_OK) ? UWB_OK : UWB_ERROR;
+}
+
+// ---- IRQ diagnosis -------------------------------------------------------------------------------
+// Register file 0, 32 bit, extended 2-byte header (same format as the PANADR test).
+static void reg_header(uint8_t hdr[2], uint8_t offset, int write)
+{
+  hdr[0] = (uint8_t)((write ? 0x80U : 0x00U) | 0x40U | (uint8_t)(offset >> 6));
+  hdr[1] = (uint8_t)((offset & 0x3FU) << 2);
+}
+
+static int reg_read32(uint8_t offset, uint32_t *value)
+{
+  uint8_t h[2];
+  uint8_t b[4];
+  reg_header(h, offset, 0);
+  if (uwb_spi_read(2, h, 4, b) != UWB_OK) {
+    return UWB_ERROR;
+  }
+  *value = le32(b);
+  return UWB_OK;
+}
+
+static int reg_write32(uint8_t offset, uint32_t value)
+{
+  uint8_t h[2];
+  uint8_t b[4] = { (uint8_t)value, (uint8_t)(value >> 8), (uint8_t)(value >> 16), (uint8_t)(value >> 24) };
+  reg_header(h, offset, 1);
+  return uwb_spi_write(2, h, 4, b);
+}
+
+#define DW_SYS_ENABLE_LO   0x3CU
+#define DW_SYS_ENABLE_HI   0x40U
+#define DW_SYS_STATUS      0x44U
+#define DW_STATUS_SPIRDY   0x00800000UL
+#define DW_STATUS_RCINIT   0x01000000UL
+
+int uwb_port_irq_diag(uwb_irq_diag_t *d)
+{
+  memset(d, 0, sizeof(*d));
+  d->rst_level = uwb_port_rst_is_high();
+  d->irq_before = uwb_port_irq_level();
+  if (reg_read32(DW_SYS_STATUS, &d->status_before) != UWB_OK ||
+      reg_read32(DW_SYS_ENABLE_LO, &d->enable_lo) != UWB_OK ||
+      reg_read32(DW_SYS_ENABLE_HI, &d->enable_hi) != UWB_OK) {
+    return UWB_ERROR;
+  }
+  // clear only the two start-up events (write 1 to clear); leave every other bit alone
+  uint32_t clear = d->status_before & (DW_STATUS_SPIRDY | DW_STATUS_RCINIT);
+  d->cleared_mask = clear;
+  if (clear != 0U && reg_write32(DW_SYS_STATUS, clear) != UWB_OK) {
+    return UWB_ERROR;
+  }
+  if (reg_read32(DW_SYS_STATUS, &d->status_after) != UWB_OK) {
+    return UWB_ERROR;
+  }
+  d->irq_after = uwb_port_irq_level();
   return UWB_OK;
 }

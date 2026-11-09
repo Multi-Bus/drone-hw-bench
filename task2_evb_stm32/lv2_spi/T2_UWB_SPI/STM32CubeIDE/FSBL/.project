@@ -57,6 +57,16 @@
 			<locationURI>PARENT-2-PROJECT_LOC/FSBL/Src/uwb_port.c</locationURI>
 		</link>
 		<link>
+			<name>Application/User/dw3000_spi.c</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/FSBL/Src/dw3000_spi.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/dw3000_hw.c</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/FSBL/Src/dw3000_hw.c</locationURI>
+		</link>
+		<link>
 			<name>Drivers/CMSIS/system_stm32n6xx_fsbl.c</name>
 			<type>1</type>
 			<locationURI>PARENT-2-PROJECT_LOC/FSBL/Src/system_stm32n6xx_fsbl.c</locationURI>
