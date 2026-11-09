@@ -196,3 +196,66 @@ int uwb_port_read_dev_id(uint32_t *dev_id, uint8_t raw[4])
   *dev_id = (uint32_t)b[0] | ((uint32_t)b[1] << 8) | ((uint32_t)b[2] << 16) | ((uint32_t)b[3] << 24);
   return UWB_OK;
 }
+
+// ---- MOSI self test (see uwb_port.h) ------------------------------------------------------------
+static uint32_t le32(const uint8_t b[4])
+{
+  return (uint32_t)b[0] | ((uint32_t)b[1] << 8) | ((uint32_t)b[2] << 16) | ((uint32_t)b[3] << 24);
+}
+
+static int panadr_read(uint32_t *value)
+{
+  static const uint8_t header[2] = { 0x40, 0x30 };   // read, extended, file 0, offset 0x0C
+  uint8_t b[4];
+  if (uwb_spi_read(2, header, 4, b) != UWB_OK) {
+    return UWB_ERROR;
+  }
+  *value = le32(b);
+  return UWB_OK;
+}
+
+static int panadr_write(uint32_t value)
+{
+  static const uint8_t header[2] = { 0xC0, 0x30 };   // write, extended, file 0, offset 0x0C
+  uint8_t b[4] = { (uint8_t)value, (uint8_t)(value >> 8), (uint8_t)(value >> 16), (uint8_t)(value >> 24) };
+  return uwb_spi_write(2, header, 4, b);
+}
+
+int uwb_port_mosi_selftest(uwb_mosi_result_t *r)
+{
+  static const uint32_t patterns[UWB_MOSI_PATTERNS] = {
+    0xFFFFFFFFUL, 0x00000000UL, 0xA5A5A5A5UL, 0x5A5A5A5AUL,
+    0x80402010UL, 0x08040201UL, 0x12345678UL, 0xCAFEBABEUL
+  };
+  static const uint8_t header_eam_devid[2] = { 0x40, 0x00 };   // read DEV_ID with an extended header
+  uint8_t b[4];
+
+  memset(r, 0, sizeof(*r));
+
+  if (uwb_spi_read(2, header_eam_devid, 4, b) != UWB_OK) {
+    return UWB_ERROR;
+  }
+  r->eam_dev_id = le32(b);
+
+  if (panadr_read(&r->panadr_orig) != UWB_OK) {
+    return UWB_ERROR;
+  }
+  for (uint32_t i = 0; i < UWB_MOSI_PATTERNS; i++) {
+    uint32_t rd = 0;
+    r->written[i] = patterns[i];
+    if (panadr_write(patterns[i]) != UWB_OK || panadr_read(&rd) != UWB_OK) {
+      return UWB_ERROR;
+    }
+    r->readback[i] = rd;
+    if (rd != patterns[i]) {
+      r->mismatches++;
+      r->stuck_low_bits |= patterns[i] & ~rd;
+      r->stuck_high_bits |= ~patterns[i] & rd;
+    }
+  }
+  // put the original value back
+  if (panadr_write(r->panadr_orig) != UWB_OK || panadr_read(&r->restored_value) != UWB_OK) {
+    return UWB_ERROR;
+  }
+  return UWB_OK;
+}

@@ -199,6 +199,45 @@ int main(void)
   printf("        read again without reset: %lu/%lu equal to the first value 0x%08lX\r\n",
          (unsigned long)same, (unsigned long)reads, (unsigned long)first_id);
   printf("verdict: %s\r\n", (family == total && same == reads) ? "PASS" : "FAIL");
+
+  /* MOSI test: DEV_ID read with an extended header (contains a 1 bit) and write/read-back of PANADR
+     (harmless register, original value restored). Repeated after a reset, 20 rounds. */
+  printf("\r\n== MOSI test: PANADR write/read-back, 20 rounds (each after a reset) ==\r\n");
+  uint32_t mosi_rounds = 20, mosi_pass = 0, mosi_err = 0;
+  for (uint32_t n = 1; n <= mosi_rounds; n++)
+  {
+    uwb_mosi_result_t r;
+    uwb_port_reset();
+    if (uwb_port_mosi_selftest(&r) != UWB_OK)
+    {
+      mosi_err++;
+      printf("#%02lu SPI ERROR\r\n", (unsigned long)n);
+      continue;
+    }
+    int eam_ok = (r.eam_dev_id == first_id);
+    int restored_ok = (r.restored_value == r.panadr_orig);
+    int ok = eam_ok && (r.mismatches == 0U) && restored_ok;
+    if (ok)
+    {
+      mosi_pass++;
+    }
+    printf("#%02lu eam_id=0x%08lX(%s) PANADR_orig=0x%08lX mismatch=%lu/%u stuck_low=0x%08lX stuck_high=0x%08lX restored=%s  %s\r\n",
+           (unsigned long)n, (unsigned long)r.eam_dev_id, eam_ok ? "ok" : "NG", (unsigned long)r.panadr_orig,
+           (unsigned long)r.mismatches, (unsigned)UWB_MOSI_PATTERNS,
+           (unsigned long)r.stuck_low_bits, (unsigned long)r.stuck_high_bits,
+           restored_ok ? "ok" : "NG", ok ? "OK" : "FAIL");
+    if (n == 1U)
+    {
+      for (uint32_t i = 0; i < UWB_MOSI_PATTERNS; i++)
+      {
+        printf("      write 0x%08lX -> read 0x%08lX\r\n", (unsigned long)r.written[i], (unsigned long)r.readback[i]);
+      }
+    }
+    HAL_Delay(100);
+  }
+  printf("MOSI result: %lu/%lu rounds OK, %lu SPI errors\r\n",
+         (unsigned long)mosi_pass, (unsigned long)mosi_rounds, (unsigned long)mosi_err);
+  printf("MOSI verdict: %s\r\n", (mosi_pass == mosi_rounds) ? "PASS" : "FAIL");
   printf("== done ==\r\n");
   /* USER CODE END 2 */
 
