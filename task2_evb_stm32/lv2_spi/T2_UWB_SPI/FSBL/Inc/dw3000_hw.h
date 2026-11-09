@@ -20,6 +20,10 @@ bool dw3000_hw_interrupt_is_enabled(void);
 // Set this to the function that runs the driver's interrupt service (the reference ports call dwt_isr()).
 // The interrupt handler calls it while the IRQ pin is high, at most DW3000_HW_ISR_MAX_LOOPS times in a row.
 extern void (*dw3000_hw_isr_hook)(void);
+
+// Calls the hook while the IRQ pin is high (at most DW3000_HW_ISR_MAX_LOOPS times). Called by the interrupt
+// handler; can also be called from the main loop. Does nothing while no hook is set.
+void dw3000_hw_irq_poll(void);
 #define DW3000_HW_ISR_MAX_LOOPS 8
 
 #endif

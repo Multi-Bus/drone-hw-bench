@@ -48,6 +48,11 @@ int dw3000_hw_init_interrupt(void)
   HAL_GPIO_Init(IRQ_PORT_, &gpio);
   HAL_NVIC_SetPriority(EXTI12_IRQn, 2, 0);
   HAL_NVIC_EnableIRQ(EXTI12_IRQn);
+  // After a reset the chip holds IRQ high until the SPIRDY start-up event is cleared (measured, see README).
+  // A rising-edge interrupt cannot see a pin that is already high, so run the handler once now.
+  if (uwb_port_irq_level()) {
+    NVIC_SetPendingIRQ(EXTI12_IRQn);
+  }
   return 0;
 }
 
@@ -91,14 +96,9 @@ bool dw3000_hw_interrupt_is_enabled(void)
 }
 
 // ---- interrupt dispatch ----------------------------------------------------------------------------
-void EXTI12_IRQHandler(void)
+void dw3000_hw_irq_poll(void)
 {
-  HAL_GPIO_EXTI_IRQHandler(IRQ_PIN_);
-}
-
-void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
-{
-  if (GPIO_Pin != IRQ_PIN_ || dw3000_hw_isr_hook == 0) {
+  if (dw3000_hw_isr_hook == 0) {
     return;
   }
   // The reference ports call the driver's interrupt service while the IRQ pin stays high. The loop is limited
@@ -106,4 +106,10 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
   for (int i = 0; i < DW3000_HW_ISR_MAX_LOOPS && uwb_port_irq_level(); i++) {
     dw3000_hw_isr_hook();
   }
+}
+
+void EXTI12_IRQHandler(void)
+{
+  HAL_GPIO_EXTI_IRQHandler(IRQ_PIN_);   // clears the EXTI flag
+  dw3000_hw_irq_poll();                  // also runs when the interrupt was only pended by software
 }

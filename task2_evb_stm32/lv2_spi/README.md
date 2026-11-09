@@ -61,7 +61,7 @@ TWR 담당자가 쓰는 드라이버의 platform 인터페이스(`platform/dw300
 | --- | --- | --- |
 | `dw3000_spi.c/.h` | `init`, `fini`, `wakeup`, `speed_slow`, `speed_fast`, `read`, `write`, `write_crc`, `trace_output` | 작성. `read`/`write`(2 MHz)는 `uwb_port`로 보드에서 시험됨. `write_crc`, `wakeup`, `speed_fast`는 시험 전. 반환값은 성공 0, 실패 -1 (Qorvo `DWT_SUCCESS`/`DWT_ERROR` 관례, 드라이버 헤더로 확인 필요) |
 | `dw3000_hw.c/.h` | `init`, `init_interrupt`, `fini`, `reset`, `wakeup`, `wakeup_pin_low`, `interrupt_enable/disable/is_enabled` | 작성. `reset`은 시험됨 (`uwb_port_reset`). 나머지 시험 전 |
-| 인터럽트 분배 | EXTI12(PD12) 상승 에지 → `dw3000_hw_isr_hook` (드라이버의 `dwt_isr()`를 연결하는 자리) | 작성, 시험 전. IRQ 핀이 High인 동안 호출하되 최대 8번으로 제한했다 (참고 포팅은 High인 동안 무한 반복이라, IRQ가 계속 High면 핸들러에서 못 빠져나올 수 있다) |
+| 인터럽트 분배 | EXTI12(PD12) 상승 에지 → `dw3000_hw_irq_poll()` → `dw3000_hw_isr_hook` (드라이버의 `dwt_isr()`를 연결하는 자리). 켤 때 IRQ가 이미 High면 한 번 소프트웨어로 걸어 줌 | 작성, 시험 전. IRQ 핀이 High인 동안 호출하되 최대 8번으로 제한했다 (참고 포팅은 High인 동안 무한 반복이라, IRQ가 계속 High면 핸들러에서 못 빠져나올 수 있다) |
 
 | `deca_port.c` | `wakeup_device_with_io`, `decamutexon/off`, `deca_sleep`, `deca_usleep`, 프로브 구조체 `dw3000_probe_interf` (`dwt_probe`용) | 작성. **드라이버 헤더가 필요해서 CubeIDE 프로젝트에는 연결하지 않았다** (`.project`에 없음). 드라이버를 프로젝트에 넣을 때 이 파일을 추가한다 |
 
@@ -73,9 +73,26 @@ TWR 담당자가 쓰는 드라이버의 platform 인터페이스(`platform/dw300
 - `deca_sleep()`은 일부러 DWT 사이클 카운터 기반 busy wait로 만들었다. `HAL_Delay()`를 쓰면 드라이버의 인터럽트 서비스(우선순위가 SysTick보다 높음) 안에서 불렸을 때 반환하지 못한다. 대신 긴 sleep 동안 CPU를 점유한다.
 - libdeca 쪽이 플랫폼에 요구하는 것(`log.h`, `dwmac_task.h` 등)은 확인하지 않았다.
 
-### IRQ 핀이 High인 이유 (진단 코드 추가, 보드 시험 전)
+### IRQ 핀이 High인 이유 (보드 2에서 확인됨)
 
-`main.c`의 마지막 단계가 리셋 직후 `SYS_STATUS`(0x44), `SYS_ENABLE_LO`(0x3C), `SYS_ENABLE_HI`(0x40)를 읽고, 시작 이벤트(`SPIRDY` 비트 23, `RCINIT` 비트 24)만 지운 뒤 IRQ 핀을 다시 읽는다 (`uwb_port_irq_diag()`). 지운 뒤 IRQ가 내려가면 켜진 직후의 이벤트가 인터럽트를 올리고 있었다는 뜻이다. 결과는 보드에서 실행한 뒤 추가한다.
+`main.c`의 마지막 단계(`uwb_port_irq_diag()`)가 리셋 직후 `SYS_STATUS`(0x44), `SYS_ENABLE_LO`(0x3C), `SYS_ENABLE_HI`(0x40)를 읽고, 시작 이벤트(`SPIRDY` 비트 23, `RCINIT` 비트 24)만 지운 뒤 IRQ 핀을 다시 읽는다. 로그: [`logs/irq_diag_board2.txt`](logs/irq_diag_board2.txt) (3회 모두 같은 결과).
+
+| 항목 | 값 |
+| --- | --- |
+| 리셋 후 `RSTn` 핀 | 1 (칩이 놓음, 시작 완료) |
+| 리셋 후 `IRQ` 핀 | **1 (High)** |
+| `SYS_STATUS` | `0x01800005` = `IRQS`(비트 0) + `SPICRCE`(비트 2) + `SPIRDY`(비트 23) + `RCINIT`(비트 24) |
+| `SYS_ENABLE_LO` | `0x00800000` = **`SPIRDY`만 켜짐** |
+| `SYS_ENABLE_HI` | `0x00000F00` = SPI 오류 4종 (`SPIERR`, `SPI_UNF`, `SPI_OVF`, `CMD_ERR`) 켜짐 |
+| `SPIRDY`, `RCINIT` 지운 뒤 | `SYS_STATUS = 0x00000004`, **IRQ = 0 (Low)** |
+
+**원인:** 리셋 후 칩이 시작을 끝내면 `SPIRDY`(SPI 준비) 이벤트가 켜지고, 이 이벤트가 기본으로 인터럽트에 허용돼 있어서(`SYS_ENABLE_LO`의 `SPIRDY`) 지울 때까지 IRQ가 High로 유지된다. **정상 동작이다** (하드웨어 문제 아님). 지우면(쓰기로 해당 비트에 1) IRQ가 Low로 내려간다. 드라이버의 `dwt_isr()`는 `SPIRDY` 이벤트를 처리하면서 `RCINIT`와 `SPIRDY`를 지운다 (드라이버 소스에서 확인).
+
+**조심할 점 (어댑터에 반영함):**
+
+- **IRQ가 이미 High인 상태에서 상승 에지 인터럽트를 켜면 에지가 없어서 인터럽트가 걸리지 않는다.** 그래서 `dw3000_hw_init_interrupt()`는 켠 뒤 핀이 High이면 인터럽트를 한 번 소프트웨어로 걸어(`NVIC_SetPendingIRQ`) 핸들러가 `SPIRDY`를 처리하게 한다. 이 경로는 컴파일과 링크만 확인했고 보드 시험 전이다.
+- 참고 포팅의 핸들러는 IRQ가 High인 동안 `dwt_isr()`를 반복해서 부른다. 처리되지 않는 이벤트가 있어 IRQ가 계속 High면 빠져나오지 못하므로 우리는 반복을 8번으로 제한했다.
+- `SYS_STATUS`의 `SPICRCE`(비트 2, SPI CRC 오류 상태)가 리셋 직후부터 1이다. 인터럽트에 허용돼 있지 않아 IRQ에는 영향이 없고, 어디서 오는 값인지는 확인하지 못했다 (SPI CRC 검사는 켜지 않았다). 읽기만 했고 지우지 않았다.
 
 ## 실행 방법
 
@@ -145,9 +162,9 @@ DEV_ID를 읽을 때 MOSI로 보내는 바이트는 헤더 `0x00`과 더미 `0x0
 
 한계: 2 MHz에서만, 보드 2에서만, 세 번의 전원 투입에서 시험했다.
 
-관찰 (원인 미확인):
+관찰 (IRQ 핀):
 
-- **IRQ 핀(PD12)이 처음부터 계속 1(High)로 읽혔다.** 초기화 직후(리셋 전)와 매 리셋 후 모두 1이었다. IRQ는 DW3000이 구동하는 출력이고 우리는 풀다운을 걸었으므로, 모듈이 High로 구동하고 있다는 뜻이다. 칩이 켜진 직후 처리되지 않은 상태 플래그(예: `SYS_STATUS`의 `RCINIT`, `SPIRDY`)가 있어 IRQ가 올라가 있을 가능성이 있지만 확인하지 않았다. Device ID 읽기에는 영향이 없었다. TWR 담당자가 인터럽트를 쓸 때 `SYS_STATUS`를 읽어서 확인하고 플래그를 지워야 한다.
+- **IRQ 핀(PD12)이 리셋 직후 계속 1(High)로 읽힌다.** 원인은 확인했다: `SPIRDY` 시작 이벤트가 인터럽트에 허용돼 있어서 지울 때까지 High가 유지된다 (위 "IRQ 핀이 High인 이유", `logs/irq_diag_board2.txt`). 정상 동작이다. Device ID 읽기에는 영향이 없었다.
 
 ## 알려진 제약과 확인 필요
 

@@ -1,0 +1,69 @@
+
+== T2 Lv2: DWM3000EVB Device ID test ==
+SPI5 mode 0, CS=PA3 (D10), RSTn=PE11 (D7), IRQ=PD12 (D8)
+SPI clock = 2000000 Hz, IRQ level = 1
+#01 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=1  OK (C0 silicon)
+#02 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=1  OK (C0 silicon)
+#03 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=1  OK (C0 silicon)
+#04 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=1  OK (C0 silicon)
+#05 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=1  OK (C0 silicon)
+#06 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=1  OK (C0 silicon)
+#07 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=1  OK (C0 silicon)
+#08 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=1  OK (C0 silicon)
+#09 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=1  OK (C0 silicon)
+#10 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=1  OK (C0 silicon)
+#11 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=1  OK (C0 silicon)
+#12 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=1  OK (C0 silicon)
+#13 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=1  OK (C0 silicon)
+#14 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=1  OK (C0 silicon)
+#15 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=1  OK (C0 silicon)
+#16 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=1  OK (C0 silicon)
+#17 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=1  OK (C0 silicon)
+#18 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=1  OK (C0 silicon)
+#19 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=1  OK (C0 silicon)
+#20 id=0xDECA0302 raw=02 03 CA DE (RIDTAG DECA MODEL 03 VER 0 REV 2) IRQ=1  OK (C0 silicon)
+
+result: reset+read 20/20 recognised (0xDECA0302 / 0xDECA0312), 20/20 DW3000 family, 0 SPI errors
+        read again without reset: 10/10 equal to the first value 0xDECA0302
+verdict: PASS
+
+== MOSI test: PANADR write/read-back, 20 rounds (each after a reset) ==
+#01 eam_id=0xDECA0302(ok) PANADR_orig=0xFFFFFFFF mismatch=0/8 stuck_low=0x00000000 stuck_high=0x00000000 restored=ok  OK
+      write 0xFFFFFFFF -> read 0xFFFFFFFF
+      write 0x00000000 -> read 0x00000000
+      write 0xA5A5A5A5 -> read 0xA5A5A5A5
+      write 0x5A5A5A5A -> read 0x5A5A5A5A
+      write 0x80402010 -> read 0x80402010
+      write 0x08040201 -> read 0x08040201
+      write 0x12345678 -> read 0x12345678
+      write 0xCAFEBABE -> read 0xCAFEBABE
+#02 eam_id=0xDECA0302(ok) PANADR_orig=0xFFFFFFFF mismatch=0/8 stuck_low=0x00000000 stuck_high=0x00000000 restored=ok  OK
+#03 eam_id=0xDECA0302(ok) PANADR_orig=0xFFFFFFFF mismatch=0/8 stuck_low=0x00000000 stuck_high=0x00000000 restored=ok  OK
+#04 eam_id=0xDECA0302(ok) PANADR_orig=0xFFFFFFFF mismatch=0/8 stuck_low=0x00000000 stuck_high=0x00000000 restored=ok  OK
+#05 eam_id=0xDECA0302(ok) PANADR_orig=0xFFFFFFFF mismatch=0/8 stuck_low=0x00000000 stuck_high=0x00000000 restored=ok  OK
+#06 eam_id=0xDECA0302(ok) PANADR_orig=0xFFFFFFFF mismatch=0/8 stuck_low=0x00000000 stuck_high=0x00000000 restored=ok  OK
+#07 eam_id=0xDECA0302(ok) PANADR_orig=0xFFFFFFFF mismatch=0/8 stuck_low=0x00000000 stuck_high=0x00000000 restored=ok  OK
+#08 eam_id=0xDECA0302(ok) PANADR_orig=0xFFFFFFFF mismatch=0/8 stuck_low=0x00000000 stuck_high=0x00000000 restored=ok  OK
+#09 eam_id=0xDECA0302(ok) PANADR_orig=0xFFFFFFFF mismatch=0/8 stuck_low=0x00000000 stuck_high=0x00000000 restored=ok  OK
+#10 eam_id=0xDECA0302(ok) PANADR_orig=0xFFFFFFFF mismatch=0/8 stuck_low=0x00000000 stuck_high=0x00000000 restored=ok  OK
+#11 eam_id=0xDECA0302(ok) PANADR_orig=0xFFFFFFFF mismatch=0/8 stuck_low=0x00000000 stuck_high=0x00000000 restored=ok  OK
+#12 eam_id=0xDECA0302(ok) PANADR_orig=0xFFFFFFFF mismatch=0/8 stuck_low=0x00000000 stuck_high=0x00000000 restored=ok  OK
+#13 eam_id=0xDECA0302(ok) PANADR_orig=0xFFFFFFFF mismatch=0/8 stuck_low=0x00000000 stuck_high=0x00000000 restored=ok  OK
+#14 eam_id=0xDECA0302(ok) PANADR_orig=0xFFFFFFFF mismatch=0/8 stuck_low=0x00000000 stuck_high=0x00000000 restored=ok  OK
+#15 eam_id=0xDECA0302(ok) PANADR_orig=0xFFFFFFFF mismatch=0/8 stuck_low=0x00000000 stuck_high=0x00000000 restored=ok  OK
+#16 eam_id=0xDECA0302(ok) PANADR_orig=0xFFFFFFFF mismatch=0/8 stuck_low=0x00000000 stuck_high=0x00000000 restored=ok  OK
+#17 eam_id=0xDECA0302(ok) PANADR_orig=0xFFFFFFFF mismatch=0/8 stuck_low=0x00000000 stuck_high=0x00000000 restored=ok  OK
+#18 eam_id=0xDECA0302(ok) PANADR_orig=0xFFFFFFFF mismatch=0/8 stuck_low=0x00000000 stuck_high=0x00000000 restored=ok  OK
+#19 eam_id=0xDECA0302(ok) PANADR_orig=0xFFFFFFFF mismatch=0/8 stuck_low=0x00000000 stuck_high=0x00000000 restored=ok  OK
+#20 eam_id=0xDECA0302(ok) PANADR_orig=0xFFFFFFFF mismatch=0/8 stuck_low=0x00000000 stuck_high=0x00000000 restored=ok  OK
+MOSI result: 20/20 rounds OK, 0 SPI errors
+MOSI verdict: PASS
+
+== IRQ diagnosis (after a reset): SYS_STATUS / SYS_ENABLE ==
+#1 RSTn=1 IRQ=1 STATUS=0x01800005 (IRQS=1 RCINIT=1 SPIRDY=1) ENABLE_LO=0x00800000 ENABLE_HI=0x00000F00
+   cleared 0x01800000 -> STATUS=0x00000004 IRQ=0
+#2 RSTn=1 IRQ=1 STATUS=0x01800005 (IRQS=1 RCINIT=1 SPIRDY=1) ENABLE_LO=0x00800000 ENABLE_HI=0x00000F00
+   cleared 0x01800000 -> STATUS=0x00000004 IRQ=0
+#3 RSTn=1 IRQ=1 STATUS=0x01800005 (IRQS=1 RCINIT=1 SPIRDY=1) ENABLE_LO=0x00800000 ENABLE_HI=0x00000F00
+   cleared 0x01800000 -> STATUS=0x00000004 IRQ=0
+== done ==
