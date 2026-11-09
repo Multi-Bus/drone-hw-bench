@@ -62,8 +62,8 @@ class Receiver:
                 self.bad += 1
 
 
-def run_condition(xiao, dongle, length, ci_ms, duration, outdir, run):
-    send(xiao, f"CFG {length} {ci_ms}")
+def run_condition(xiao, dongle, length, ci_ms, duration, outdir, run, rate=0):
+    send(xiao, f"CFG {length} {ci_ms} {rate}")
     wait_for(xiao, "OK CFG")
     time.sleep(3.0)                      # let the central accept the new connection parameters
     send(xiao, "STAT")
@@ -119,7 +119,12 @@ def run_condition(xiao, dongle, length, ci_ms, duration, outdir, run):
         "bad_lines": rx.bad,
     }
 
-    name = f"t4_tp_len{length}_ci{ci_ms:g}ms_r{run}.csv"
+    if rate:   # fixed-rate mode (drone requirement check): add rate and target to the result
+        result["rate_pps"] = rate
+        result["target_Bps"] = rate * length
+        name = f"t4_rate{rate}_len{length}_ci{ci_ms:g}ms_r{run}.csv"
+    else:
+        name = f"t4_tp_len{length}_ci{ci_ms:g}ms_r{run}.csv"
     with open(os.path.join(outdir, name), "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["t_s", "rx_bytes"])
@@ -136,20 +141,22 @@ def main():
     ap.add_argument("--cis", default="7.5,15,30,50,100", help="connection intervals in ms")
     ap.add_argument("--duration", type=int, default=30, help="seconds per condition")
     ap.add_argument("--run", type=int, default=1, help="repeat number, goes into file names and the summary")
+    ap.add_argument("--rate", type=int, default=0,
+                    help="packets per second, 0 = as fast as possible (throughput); e.g. 50 with --lens 64 for the 3.2 kB/s drone check")
     ap.add_argument("--outdir", default=os.path.join(os.path.dirname(__file__), "..", "data"))
     args = ap.parse_args()
     os.makedirs(args.outdir, exist_ok=True)
 
     lens = [int(x) for x in args.lens.split(",")]
     cis = [float(x) for x in args.cis.split(",")]
-    summary_path = os.path.join(args.outdir, "t4_tp_summary.csv")
+    summary_path = os.path.join(args.outdir, "t4_rate_summary.csv" if args.rate else "t4_tp_summary.csv")
 
     with serial.Serial(args.xiao, 115200, timeout=0.5) as xiao, \
             serial.Serial(args.dongle, 115200, timeout=0.05) as dongle:
         for ci_ms in cis:
             for length in lens:
                 print(f"len={length} B, ci={ci_ms:g} ms ...", flush=True)
-                r = run_condition(xiao, dongle, length, ci_ms, args.duration, args.outdir, args.run)
+                r = run_condition(xiao, dongle, length, ci_ms, args.duration, args.outdir, args.run, args.rate)
                 print(f"  actual ci={r['ci_actual_ms']} ms, mtu={r['mtu']}, "
                       f"{r['avg_Bps']} B/s, loss={r['loss_pct']} %", flush=True)
                 new = not os.path.exists(summary_path)

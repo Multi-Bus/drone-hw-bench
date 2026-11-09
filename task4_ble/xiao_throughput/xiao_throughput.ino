@@ -2,7 +2,8 @@
 // Board: Seeed nRF52 Boards (non-mbed) > Seeed XIAO nRF52840 (Sense)
 //
 // USB serial commands (115200, one line each, sent by measure/throughput.py):
-//   CFG <len> <ci_ms>   packet length in bytes (20..244) and requested connection interval in ms
+//   CFG <len> <ci_ms> [rate]   packet length in bytes (20..244), requested connection interval in ms,
+//                              optional packets per second (omitted or 0 = as fast as possible)
 //   START               reset counters, send packets as fast as the link allows
 //   STOP                stop sending, print totals
 //   STAT                print the connection's actual MTU, interval and data length
@@ -19,6 +20,8 @@ static const uint16_t PKT_MAX = 244;     // MTU 247 - 3 bytes ATT header
 uint16_t conn_hdl = BLE_CONN_HANDLE_INVALID;
 uint16_t pkt_len = 100;
 uint16_t ci_units = 12;                  // connection interval, unit 1.25 ms (12 = 15 ms)
+uint32_t rate = 0;                       // packets per second, 0 = as fast as possible
+uint32_t period_us = 0, next_us = 0;
 bool running = false;
 uint32_t seq = 0, tx_pkts = 0, tx_bytes = 0, t_start = 0;
 
@@ -69,9 +72,13 @@ void handle_line(String line) {
   if (line.startsWith("CFG")) {
     // "CFG <len> <ci_ms>"; sscanf can't read floats in this core's newlib-nano
     int sp = line.indexOf(' ', 4);
+    int sp2 = line.indexOf(' ', sp + 1);
     int len = line.substring(4, sp).toInt();
-    float ci_ms = line.substring(sp + 1).toFloat();
-    if (sp > 0 && len > 0 && ci_ms > 0) {
+    float ci_ms = line.substring(sp + 1, sp2 < 0 ? line.length() : sp2).toFloat();
+    int r = sp2 < 0 ? 0 : line.substring(sp2 + 1).toInt();   // packets per second, 0 = as fast as possible
+    if (sp > 0 && len > 0 && ci_ms > 0 && r >= 0) {
+      rate = r;
+      period_us = r ? 1000000UL / r : 0;
       pkt_len = constrain(len, 20, PKT_MAX);
       ci_units = (uint16_t)(ci_ms / 1.25f + 0.5f);
       Bluefruit.Periph.setConnInterval(ci_units, ci_units);
@@ -79,7 +86,7 @@ void handle_line(String line) {
         Bluefruit.Connection(conn_hdl)->requestConnectionParameter(ci_units);
       }
       pend_len = 0;
-      Serial.printf("OK CFG len=%u ci_units=%u\n", pkt_len, ci_units);
+      Serial.printf("OK CFG len=%u ci_units=%u rate=%lu\n", pkt_len, ci_units, (unsigned long)rate);
     } else {
       Serial.println("ERR CFG");
     }
@@ -87,6 +94,7 @@ void handle_line(String line) {
     seq = tx_pkts = tx_bytes = 0;
     pend_len = 0;
     t_start = millis();
+    next_us = micros();
     running = true;
     Serial.println("OK START");
   } else if (line == "STOP") {
@@ -114,7 +122,14 @@ void loop() {
   if (!running || !bleuart.notifyEnabled()) return;
 
   for (int i = 0; i < 8; i++) {          // small burst per loop pass
-    if (pend_len == 0) build_packet();
+    if (pend_len == 0) {
+      if (period_us) {                   // fixed-rate mode: one packet per period
+        if ((int32_t)(micros() - next_us) < 0) break;            // not due yet
+        next_us += period_us;
+        if ((int32_t)(micros() - next_us) > 1000000) next_us = micros();  // blocked for long: do not burst to catch up
+      }
+      build_packet();
+    }
     pend_off += bleuart.write(pend + pend_off, pend_len - pend_off);
     if (pend_off < pend_len) break;      // TX FIFO full, retry the rest next pass
     tx_pkts++;

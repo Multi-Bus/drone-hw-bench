@@ -8,7 +8,7 @@
 | 레벨 | 상태 | 비고 |
 | --- | --- | --- |
 | Lv1 동작 확인 | 완료 | 스마트폰 수신, 동글 경유 PC 수신 모두 근거 있음 |
-| Lv2 성능 측정 | 진행 중 | 시퀀스·타임스탬프, 처리량 완료. RTT, 거리별 손실률, 요구치 비교 남음 |
+| Lv2 성능 측정 | 진행 중 | 시퀀스·타임스탬프, 처리량, 요구치 비교 완료. RTT, 거리별 손실률 남음 |
 | Lv3 심화 | 시작 전 | Lv2 완료 후 |
 
 ## Lv1 체크리스트
@@ -27,7 +27,7 @@
 - [x] 2. 처리량: 최대 bytes/s (패킷 크기, connection interval 변경) — 아래 "결과 (Lv2 처리량)"
 - [ ] 3. RTT: PC → 동글 → XIAO → 에코 → PC, 1,000회 평균·최대
 - [ ] 4. 거리별 RSSI와 패킷 손실률: 1 / 5 / 10 / 20 m, 각 1분
-- [ ] 5. 드론 요구치 비교 (50 Hz × 64 B = 3.2 kB/s 손실 없이 가능한지)
+- [x] 5. 드론 요구치 비교 (50 Hz × 64 B = 3.2 kB/s 손실 없이 가능한지) — 아래 "결과 (Lv2 요구치 비교)"
 
 Lv2 공통 결과물: 조건별 raw CSV(파일명에 조건 표기, 예 `t4_dist_5m.csv`), 결과 표(조건·측정 횟수·평균·표준편차·최대·성공률), 측정 배치 사진, 결론 한두 줄.
 
@@ -54,7 +54,7 @@ Lv2 공통 결과물: 조건별 raw CSV(파일명에 조건 표기, 예 `t4_dist
 - 포트는 부트로더 진입·업로드 때마다 바뀔 수 있다 (COM3 ↔ COM4 등). 업로드 전에 장치 관리자에서 확인.
 - XIAO: Arduino IDE에서 `xiao_peripheral/xiao_peripheral.ino`를 열고 Board = Seeed XIAO nRF52840 (Sense), 포트 선택 후 Upload.
 - 동글: `dongle_central/README.md` 참고. `dongle_central/build.sh`로 빌드하거나 `dongle_central/artifacts/central_uart_mtu247.hex`를 Programmer로 Write (RESET으로 부트로더 진입).
-- 처리량 측정: XIAO에 `xiao_throughput/xiao_throughput.ino` 업로드(Lv1의 `xiao_peripheral`을 대체), `pip install pyserial`, 그다음 `python measure/throughput.py --xiao <XIAO 포트> --dongle <동글 포트>`.
+- 처리량·요구치 측정: XIAO에 `xiao_throughput/xiao_throughput.ino` 업로드(Lv1의 `xiao_peripheral`을 대체), `pip install pyserial`, 그다음 `python measure/throughput.py --xiao <XIAO 포트> --dongle <동글 포트>`.
 
 ## 패킷 형식
 
@@ -106,6 +106,22 @@ ASCII 한 줄 `<seq>,<millis>\n`. seq는 송신 순번, millis는 XIAO 시계. X
 
 동글 central을 처리량 측정에 맞게 고친 내용(MTU 247, 힙, 버퍼)은 `dongle_central/README.md` 참고.
 
+## 결과 (Lv2 요구치 비교)
+
+드론 요구치 예시인 50 Hz × 64 B = 3.2 kB/s를 손실 없이 보낼 수 있는지 본다. 처리량 측정과 같은 스케치·스크립트에서 송신 속도를 지정한다(`CFG 64 <간격> 50`, 스크립트 `--rate 50`). 패킷 64 B를 초당 50개, 조건마다 60초, 3회 반복.
+
+원자료: `data/t4_rate50_len64_ci<간격>ms_r<회차>.csv` (초당 수신 bytes), 요약 `data/t4_rate_summary.csv`. 실행: `python measure/throughput.py --xiao COM3 --dongle COM8 --lens 64 --cis 7.5,30,100 --rate 50 --duration 60 --run <회차>`.
+
+| 연결 간격 | 측정 횟수 | 보낸 패킷 | 받은 패킷 | 성공률 | 수신 평균 | 초당 최소 / 최대 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 7.5 ms | 3회 × 60 s | 9005 | 9005 | 100% (손실 0) | 3201.4 B/s | 3008 / 3392 |
+| 30 ms | 3회 × 60 s | 9005 | 9005 | 100% (손실 0) | 3201.4 B/s | 3007 / 3457 |
+| 100 ms | 3회 × 60 s | 9003 | 9003 | 100% (손실 0) | 3198.6 B/s | 2944 / 3456 |
+
+결론: 50 Hz × 64 B(3.2 kB/s)는 연결 간격 7.5 / 30 / 100 ms에서 모두 손실 없이 전송됐다(9회, 총 27,013 패킷 전부 수신, seq 끊김과 깨진 줄 0). 초당 수신량이 최대 약 ±250 B/s 흔들리는 것은 알림이 연결 이벤트 단위로 묶여 도착하기 때문으로 보이며, 손실과는 다르다(이 해석은 확인하지 않았다).
+
+한계: 포화 측정과 같은 거리에서 측정했고(XIAO와 동글 사이 거리·배치는 기록하지 않았다), 거리별 손실은 Lv2 4번에서 따로 본다. 시험 시간은 조건당 60초씩 3회다.
+
 ## 진행 기록
 
 - 2단계 완료 (2026-11-07): `xiao_blink` 업로드, USB 시리얼에 `LED on/off` 출력 확인.
@@ -114,3 +130,4 @@ ASCII 한 줄 `<seq>,<millis>\n`. seq는 송신 순번, millis는 XIAO 시계. X
 - 4단계 빌드 (2026-11-07): `dongle_central/`의 `central_uart`(NCS v2.9.0)를 동글용으로 수정해 `nrf52840dongle/nrf52840`로 빌드, hex 생성. 올린 뒤 USB가 인식되지 않음.
 - 4·5단계 완료 (2026-11-08): 원인은 `CONFIG_BT_SETTINGS=y`. `n`으로 바꾸고 플래시 → COM 포트 생성, XIAO1에서 `seq,millis` 수신. 격리 과정은 삽질기록.md Task 4 참고.
 - Lv2 처리량 완료 (2026-11-08): `xiao_throughput` 스케치와 `measure/throughput.py`로 패킷 3종 × 연결 간격 5종, 조건당 30초 × 3회 측정. 막힘 3건(연결 직후 요청 충돌, MTU 65 제한, 동글 힙·버퍼 부족)은 삽질기록.md Task 4 참고.
+- Lv2 요구치 비교 완료 (2026-11-09): 스케치에 송신 속도 지정 추가, 64 B × 50패킷/초를 연결 간격 3종 × 60초 × 3회 측정, 손실 0.
