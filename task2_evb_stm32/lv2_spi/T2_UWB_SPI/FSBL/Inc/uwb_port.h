@@ -60,4 +60,27 @@ typedef struct {
 
 int uwb_port_mosi_selftest(uwb_mosi_result_t *result);   // UWB_OK if all SPI transfers worked
 
+// ---- additions for the DW3000 driver adapter ------------------------------------------------------
+void uwb_port_delay_us(uint32_t us);        // busy wait, uses the DWT cycle counter
+int  uwb_port_rst_is_high(void);            // RSTn level (the chip pulls it low while it starts up)
+void uwb_port_cs_wakeup(void);              // wake the chip with a long CS low pulse (when no WAKEUP pin is used)
+void uwb_port_spi_deinit(void);
+int  uwb_spi_write_crc(uint16_t header_len, const uint8_t *header, uint16_t body_len, const uint8_t *body, uint8_t crc8);
+
+// ---- IRQ diagnosis -------------------------------------------------------------------------------
+// Why does the IRQ pin read High right after power-up? Reads SYS_STATUS (0x44), SYS_ENABLE_LO (0x3C) and
+// SYS_ENABLE_HI (0x40), clears only the SPIRDY and RCINIT start-up events, and reads the IRQ pin again.
+typedef struct {
+  int      rst_level;        // RSTn pin level (1 = released / chip ready)
+  int      irq_before;
+  uint32_t status_before;
+  uint32_t enable_lo;
+  uint32_t enable_hi;
+  uint32_t cleared_mask;     // which of SPIRDY (bit 23) and RCINIT (bit 24) were set and got cleared
+  uint32_t status_after;
+  int      irq_after;
+} uwb_irq_diag_t;
+
+int uwb_port_irq_diag(uwb_irq_diag_t *d);
+
 #endif
