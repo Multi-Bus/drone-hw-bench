@@ -20,7 +20,7 @@ import serial
 SEQ = re.compile(r'sequence_number=(\d+)')
 MAC = re.compile(r'mac_address=(0x[0-9a-fA-F]+)')
 STATUS = re.compile(r'status="(\w+)"')
-DIST = re.compile(r'distance\[cm\]=(\d+)')
+DIST = re.compile(r'distance\[cm\]=(-?\d+)')  # NLOS나 가림에서는 음수 거리도 나온다
 
 
 def parse(buffer):
