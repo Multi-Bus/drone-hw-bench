@@ -133,6 +133,7 @@ EVB는 Arduino 실드라서 **Nucleo의 Arduino 헤더에 직접 꽂는 구성**
 - [x] SPI5 핀 기능: ST 예제 `SPI_FullDuplex`가 PE15, PG1, PG2를 AF5로 쓰고, 보드 2에서 SCK와 MISO가 동작함
 - [ ] 회로도(V1.2)와 실물(`Module shield v1.3`)의 차이 여부를 가능하면 Qorvo Quick Start Guide 등으로 확인
 - [x] 전원 인가, Device ID 읽기 `0xDECA0302` 20/20, 로그 저장 (`logs/device_id_board2.txt`)
-- [ ] **MOSI(PG2, D11) 검증**: Device ID 읽기는 보내는 바이트가 모두 0이라 MOSI가 눌려 있어도 성공한다. 0이 아닌 값을 보내는 시험이 필요하다
-- [ ] 전원 재투입·USB 재연결 반복, 보드 1에서의 시험
+- [x] **MOSI(PG2, D11) 검증됨**: 쓰기-읽기 시험 3회 실행 모두 20/20 PASS (`logs/device_id_mosi_board2_run1~3.txt`). 참고로 Device ID 읽기만으로는 검증되지 않아 별도 시험을 했다. 원래 문구:: Device ID 읽기는 보내는 바이트가 모두 0이라 MOSI가 눌려 있어도 성공한다. 0이 아닌 값을 보내는 시험이 필요하다
+- [x] 전원 재투입(USB 재연결) 반복 2회: 같은 결과
+- [ ] 보드 1에서의 시험
 - [ ] IRQ 핀이 처음부터 High로 읽힌 이유 확인 (`SYS_STATUS` 플래그 가능성)
