@@ -1,0 +1,198 @@
+// Task 2 Lv2: hardware port layer, see uwb_port.h.
+#include "uwb_port.h"
+#include "main.h"
+#include <string.h>
+
+#define UWB_SPI_MAX_FRAME 1100U   // header + payload (a DW3000 RX frame is up to 1023 bytes)
+
+#define CS_PORT   GPIOA
+#define CS_PIN    GPIO_PIN_3      // D10
+#define RST_PORT  GPIOE
+#define RST_PIN   GPIO_PIN_11     // D7
+#define IRQ_PORT  GPIOD
+#define IRQ_PIN   GPIO_PIN_12     // D8
+
+// SPI5 kernel clock is HSI (64 MHz), set in HAL_SPI_MspInit as in the ST SPI_FullDuplex example.
+#define SPI_KERNEL_HZ        64000000UL
+#define SPI_PRESC_SLOW       SPI_BAUDRATEPRESCALER_32   // 64 MHz / 32 = 2 MHz
+#define SPI_PRESC_FAST       SPI_BAUDRATEPRESCALER_8    // 64 MHz / 8  = 8 MHz
+
+static SPI_HandleTypeDef hspi5;
+static uint32_t spi_divider = 32U;
+static uint8_t tx_buf[UWB_SPI_MAX_FRAME];
+static uint8_t rx_buf[UWB_SPI_MAX_FRAME];
+
+// Called by HAL_SPI_Init(). Pin and clock setup copied from the ST SPI_FullDuplex_ComDMA_Master example (no DMA).
+void HAL_SPI_MspInit(SPI_HandleTypeDef *hspi)
+{
+  if (hspi->Instance == SPI5) {
+    RCC_PeriphCLKInitTypeDef clk = {0};
+    clk.PeriphClockSelection = RCC_PERIPHCLK_SPI5;
+    clk.Spi5ClockSelection = RCC_SPI5CLKSOURCE_HSI;
+    if (HAL_RCCEx_PeriphCLKConfig(&clk) != HAL_OK) {
+      Error_Handler();
+    }
+    __HAL_RCC_SPI5_CLK_ENABLE();
+    __HAL_RCC_GPIOE_CLK_ENABLE();
+    __HAL_RCC_GPIOG_CLK_ENABLE();
+
+    GPIO_InitTypeDef gpio = {0};
+    gpio.Mode = GPIO_MODE_AF_PP;
+    gpio.Pull = GPIO_NOPULL;
+    gpio.Speed = GPIO_SPEED_FREQ_HIGH;
+    gpio.Alternate = GPIO_AF5_SPI5;
+    gpio.Pin = GPIO_PIN_15;                    // PE15 = SPI5_SCK
+    HAL_GPIO_Init(GPIOE, &gpio);
+    gpio.Pin = GPIO_PIN_1 | GPIO_PIN_2;        // PG1 = SPI5_MISO, PG2 = SPI5_MOSI
+    HAL_GPIO_Init(GPIOG, &gpio);
+  }
+}
+
+static int spi5_start(uint32_t prescaler, uint32_t divider)
+{
+  hspi5.Instance = SPI5;
+  hspi5.Init.Mode = SPI_MODE_MASTER;
+  hspi5.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi5.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi5.Init.CLKPolarity = SPI_POLARITY_LOW;     // SPI mode 0 (CPOL 0, CPHA 0)
+  hspi5.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi5.Init.NSS = SPI_NSS_SOFT;                 // chip select is a GPIO (PA3)
+  hspi5.Init.BaudRatePrescaler = prescaler;
+  hspi5.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi5.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi5.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi5.Init.CRCPolynomial = 0x7;
+  hspi5.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
+  hspi5.Init.NSSPolarity = SPI_NSS_POLARITY_LOW;
+  hspi5.Init.FifoThreshold = SPI_FIFO_THRESHOLD_01DATA;
+  hspi5.Init.MasterSSIdleness = SPI_MASTER_SS_IDLENESS_00CYCLE;
+  hspi5.Init.MasterInterDataIdleness = SPI_MASTER_INTERDATA_IDLENESS_00CYCLE;
+  hspi5.Init.MasterReceiverAutoSusp = SPI_MASTER_RX_AUTOSUSP_DISABLE;
+  hspi5.Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_ENABLE;
+  hspi5.Init.IOSwap = SPI_IO_SWAP_DISABLE;
+  hspi5.Init.ReadyMasterManagement = SPI_RDY_MASTER_MANAGEMENT_INTERNALLY;
+  hspi5.Init.ReadyPolarity = SPI_RDY_POLARITY_HIGH;
+  if (HAL_SPI_Init(&hspi5) != HAL_OK) {
+    return UWB_ERROR;
+  }
+  spi_divider = divider;
+  return UWB_OK;
+}
+
+int uwb_port_init(void)
+{
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
+  __HAL_RCC_GPIOE_CLK_ENABLE();
+
+  GPIO_InitTypeDef gpio = {0};
+
+  // chip select: output, idle high (set the level before switching the pin to output)
+  HAL_GPIO_WritePin(CS_PORT, CS_PIN, GPIO_PIN_SET);
+  gpio.Pin = CS_PIN;
+  gpio.Mode = GPIO_MODE_OUTPUT_PP;
+  gpio.Pull = GPIO_NOPULL;
+  gpio.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(CS_PORT, &gpio);
+
+  // RSTn: open-drain output, released (high = high impedance). Never driven high by the MCU.
+  HAL_GPIO_WritePin(RST_PORT, RST_PIN, GPIO_PIN_SET);
+  gpio.Pin = RST_PIN;
+  gpio.Mode = GPIO_MODE_OUTPUT_OD;
+  gpio.Pull = GPIO_NOPULL;
+  gpio.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(RST_PORT, &gpio);
+
+  // IRQ: input. Pull-down so the pin reads low when no shield is attached.
+  gpio.Pin = IRQ_PIN;
+  gpio.Mode = GPIO_MODE_INPUT;
+  gpio.Pull = GPIO_PULLDOWN;
+  gpio.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(IRQ_PORT, &gpio);
+
+  return spi5_start(SPI_PRESC_SLOW, 32U);
+}
+
+void uwb_port_spi_slow(void)
+{
+  (void)HAL_SPI_DeInit(&hspi5);
+  (void)spi5_start(SPI_PRESC_SLOW, 32U);
+}
+
+void uwb_port_spi_fast(void)
+{
+  (void)HAL_SPI_DeInit(&hspi5);
+  (void)spi5_start(SPI_PRESC_FAST, 8U);
+}
+
+uint32_t uwb_port_spi_hz(void)
+{
+  return SPI_KERNEL_HZ / spi_divider;
+}
+
+void uwb_port_sleep_ms(uint32_t ms)
+{
+  HAL_Delay(ms);
+}
+
+void uwb_port_reset(void)
+{
+  HAL_GPIO_WritePin(RST_PORT, RST_PIN, GPIO_PIN_RESET);   // pull RSTn low (open-drain)
+  HAL_Delay(2);                                           // the chip needs at least about 10 us; HAL_Delay(2) is 2 to 3 ms
+  HAL_GPIO_WritePin(RST_PORT, RST_PIN, GPIO_PIN_SET);     // release
+  HAL_Delay(5);                                           // the chip needs about 2 ms to start (INIT_RC -> IDLE_RC)
+}
+
+int uwb_port_irq_level(void)
+{
+  return (HAL_GPIO_ReadPin(IRQ_PORT, IRQ_PIN) == GPIO_PIN_SET) ? 1 : 0;
+}
+
+int uwb_spi_read(uint16_t header_len, const uint8_t *header, uint16_t read_len, uint8_t *read_buf)
+{
+  uint32_t total = (uint32_t)header_len + read_len;
+  if (total == 0U || total > UWB_SPI_MAX_FRAME) {
+    return UWB_ERROR;
+  }
+  memcpy(tx_buf, header, header_len);
+  memset(tx_buf + header_len, 0, read_len);
+
+  HAL_GPIO_WritePin(CS_PORT, CS_PIN, GPIO_PIN_RESET);
+  HAL_StatusTypeDef st = HAL_SPI_TransmitReceive(&hspi5, tx_buf, rx_buf, (uint16_t)total, 100);
+  HAL_GPIO_WritePin(CS_PORT, CS_PIN, GPIO_PIN_SET);
+  if (st != HAL_OK) {
+    return UWB_ERROR;
+  }
+  memcpy(read_buf, rx_buf + header_len, read_len);
+  return UWB_OK;
+}
+
+int uwb_spi_write(uint16_t header_len, const uint8_t *header, uint16_t body_len, const uint8_t *body)
+{
+  uint32_t total = (uint32_t)header_len + body_len;
+  if (total == 0U || total > UWB_SPI_MAX_FRAME) {
+    return UWB_ERROR;
+  }
+  memcpy(tx_buf, header, header_len);
+  memcpy(tx_buf + header_len, body, body_len);
+
+  HAL_GPIO_WritePin(CS_PORT, CS_PIN, GPIO_PIN_RESET);
+  HAL_StatusTypeDef st = HAL_SPI_Transmit(&hspi5, tx_buf, (uint16_t)total, 100);
+  HAL_GPIO_WritePin(CS_PORT, CS_PIN, GPIO_PIN_SET);
+  return (st == HAL_OK) ? UWB_OK : UWB_ERROR;
+}
+
+int uwb_port_read_dev_id(uint32_t *dev_id, uint8_t raw[4])
+{
+  // One-byte header: read (bit 7 = 0), register file 0 (DEV_ID), offset 0, "fast access" short header.
+  // This follows dwt_xfer3000() in the Qorvo DW3000 API (a read of offset 0 uses the 1-byte header), which
+  // gives 0x00 for DEV_ID. To be confirmed on the first real read (a good ID such as 0xDECA03xx confirms it).
+  static const uint8_t header[1] = { 0x00 };
+  uint8_t b[4];
+  if (uwb_spi_read(1, header, 4, b) != UWB_OK) {
+    return UWB_ERROR;
+  }
+  memcpy(raw, b, 4);
+  *dev_id = (uint32_t)b[0] | ((uint32_t)b[1] << 8) | ((uint32_t)b[2] << 16) | ((uint32_t)b[3] << 24);
+  return UWB_OK;
+}
