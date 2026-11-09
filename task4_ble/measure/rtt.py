@@ -8,9 +8,9 @@ A ping with no reply within --timeout counts as lost (and is not part of the RTT
 The measured time includes the PC serial stack and the USB path, not only the radio link.
 
 Output per condition: <outdir>/t4_rtt_len<L>_ci<C>ms.csv   (n, rtt_ms; empty = lost)
-Output summary:       <outdir>/t4_rtt_summary.csv          (one row per condition)
+Output summary:       <outdir>/summary.csv                 (one row per condition)
 
-Usage: python rtt.py --xiao COM3 --dongle COM8 --outdir ../data
+Usage: python rtt.py --xiao COM3 --dongle COM8        (writes to data/lv2/rtt)
 """
 import argparse
 import csv
@@ -94,10 +94,10 @@ def main():
     ap.add_argument("--cis", default="7.5,30,100", help="connection intervals in ms")
     ap.add_argument("--count", type=int, default=1000, help="pings per condition")
     ap.add_argument("--timeout", type=float, default=1.0, help="seconds to wait for one echo")
-    ap.add_argument("--outdir", default=os.path.join(os.path.dirname(__file__), "..", "data"))
+    ap.add_argument("--outdir", default=os.path.join(os.path.dirname(__file__), "..", "data", "lv2", "rtt"))
     args = ap.parse_args()
     os.makedirs(args.outdir, exist_ok=True)
-    summary_path = os.path.join(args.outdir, "t4_rtt_summary.csv")
+    summary_path = os.path.join(args.outdir, "summary.csv")
 
     with serial.Serial(args.xiao, 115200, timeout=0.5) as xiao, \
             serial.Serial(args.dongle, 115200, timeout=0.005) as dongle:

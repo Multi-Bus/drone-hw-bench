@@ -38,5 +38,5 @@ task4_ble/dongle_central/build.sh
 ## 확인 결과 (Task 4 Lv1)
 
 - 동글 COM 포트 `VID_2FE3&PID_0100`, XIAO1 연결 후 `seq,millis` 줄 수신 (약 100 ms 간격).
-- 15초 수신 로그: [`../data/t4_lv1_dongle_rx_15s.csv`](../data/t4_lv1_dongle_rx_15s.csv) (148행, seq 끊김 0, 간격 50–150 ms).
+- 15초 수신 로그: [`../data/lv1/pc_rx/t4_lv1_dongle_rx_15s.csv`](../data/lv1/pc_rx/t4_lv1_dongle_rx_15s.csv) (148행, seq 끊김 0, 간격 50–150 ms).
 - 확인 안 됨: RC(`K32SRC_RC`) 사용 조건에서 BLE 장시간 안정성, 연결 끊김 후 재연결 시간.
