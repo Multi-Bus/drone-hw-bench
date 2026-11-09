@@ -8,6 +8,8 @@
 //   STOP                stop sending, print totals
 //   STAT                print the connection's actual MTU, interval and data length
 //
+// Everything the central writes to the NUS RX characteristic is echoed back at once (RTT test).
+//
 // Packet (ASCII): "<seq>,<millis>," + 'x' padding + "\n", exactly <len> bytes.
 // The receiver reads lines; a gap in seq means a lost packet.
 #include <Adafruit_TinyUSB.h>
@@ -117,6 +119,12 @@ void loop() {
     char c = Serial.read();
     if (c == '\n') { handle_line(line); line = ""; }
     else if (c != '\r') line += c;
+  }
+
+  if (bleuart.available()) {             // echo for the RTT test (measure/rtt.py)
+    uint8_t echo[PKT_MAX];
+    int n = bleuart.read(echo, sizeof echo);
+    bleuart.write(echo, n);
   }
 
   if (!running || !bleuart.notifyEnabled()) return;

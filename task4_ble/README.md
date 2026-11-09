@@ -8,7 +8,7 @@
 | 레벨 | 상태 | 비고 |
 | --- | --- | --- |
 | Lv1 동작 확인 | 완료 | 스마트폰 수신, 동글 경유 PC 수신 모두 근거 있음 |
-| Lv2 성능 측정 | 진행 중 | 시퀀스·타임스탬프, 처리량, 요구치 비교 완료. RTT, 거리별 손실률 남음 |
+| Lv2 성능 측정 | 진행 중 | 시퀀스·타임스탬프, 처리량, RTT, 요구치 비교 완료. 거리별 손실률(RSSI 포함) 남음 |
 | Lv3 심화 | 시작 전 | Lv2 완료 후 |
 
 ## Lv1 체크리스트
@@ -25,7 +25,7 @@
 
 - [x] 1. 패킷에 시퀀스 번호와 타임스탬프 (`seq,millis`, 손실·지연 계산용)
 - [x] 2. 처리량: 최대 bytes/s (패킷 크기, connection interval 변경) — 아래 "결과 (Lv2 처리량)"
-- [ ] 3. RTT: PC → 동글 → XIAO → 에코 → PC, 1,000회 평균·최대
+- [x] 3. RTT: PC → 동글 → XIAO → 에코 → PC, 1,000회 평균·최대 — 아래 "결과 (Lv2 RTT)"
 - [ ] 4. 거리별 RSSI와 패킷 손실률: 1 / 5 / 10 / 20 m, 각 1분
 - [x] 5. 드론 요구치 비교 (50 Hz × 64 B = 3.2 kB/s 손실 없이 가능한지) — 아래 "결과 (Lv2 요구치 비교)"
 
@@ -54,7 +54,7 @@ Lv2 공통 결과물: 조건별 raw CSV(파일명에 조건 표기, 예 `t4_dist
 - 포트는 부트로더 진입·업로드 때마다 바뀔 수 있다 (COM3 ↔ COM4 등). 업로드 전에 장치 관리자에서 확인.
 - XIAO: Arduino IDE에서 `xiao_peripheral/xiao_peripheral.ino`를 열고 Board = Seeed XIAO nRF52840 (Sense), 포트 선택 후 Upload.
 - 동글: `dongle_central/README.md` 참고. `dongle_central/build.sh`로 빌드하거나 `dongle_central/artifacts/central_uart_mtu247.hex`를 Programmer로 Write (RESET으로 부트로더 진입).
-- 처리량·요구치 측정: XIAO에 `xiao_throughput/xiao_throughput.ino` 업로드(Lv1의 `xiao_peripheral`을 대체), `pip install pyserial`, 그다음 `python measure/throughput.py --xiao <XIAO 포트> --dongle <동글 포트>`.
+- 처리량·요구치·RTT 측정: XIAO에 `xiao_throughput/xiao_throughput.ino` 업로드(Lv1의 `xiao_peripheral`을 대체), `pip install pyserial`, 그다음 `python measure/throughput.py --xiao <XIAO 포트> --dongle <동글 포트>`(처리량, `--rate`로 요구치) 또는 `python measure/rtt.py --xiao <XIAO 포트> --dongle <동글 포트>`(RTT).
 
 ## 패킷 형식
 
@@ -122,6 +122,26 @@ ASCII 한 줄 `<seq>,<millis>\n`. seq는 송신 순번, millis는 XIAO 시계. X
 
 한계: 포화 측정과 같은 거리에서 측정했고(XIAO와 동글 사이 거리·배치는 기록하지 않았다), 거리별 손실은 Lv2 4번에서 따로 본다. 시험 시간은 조건당 60초씩 3회다.
 
+## 결과 (Lv2 RTT)
+
+경로: PC → 동글(USB 시리얼) → BLE(NUS RX 쓰기) → XIAO → 에코(NUS TX 알림) → 동글 → PC. PC(`measure/rtt.py`)가 64 B 줄 `<번호>,xxxx…
+`을 한 번에 하나씩 보내고, 같은 번호의 줄이 돌아올 때까지의 시간을 `perf_counter`로 잰다. 연결 간격마다 1,000회. 응답이 1초 안에 안 오면 손실로 세고 RTT 통계에서는 뺀다. XIAO는 `xiao_throughput.ino`의 에코 기능(받은 바이트를 그대로 되돌림)을 쓴다.
+
+원자료: `data/t4_rtt_len64_ci<간격>ms.csv` (번호별 RTT, 빈 칸은 손실), 요약 `data/t4_rtt_summary.csv`. 실행: `python measure/rtt.py --xiao COM3 --dongle COM8`.
+
+| 연결 간격 | 측정 횟수 | 평균 (ms) | 표준편차 | 최대 | 최소 | 중앙값 | 95% | 성공률 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 7.5 ms | 1,000 | 26.0 | 2.1 | 31.4 | 10.6 | 26.3 | 27.3 | 100% |
+| 30 ms | 1,000 | 55.3 | 13.8 | 86.8 | 39.9 | 56.8 | 73.9 | 100% |
+| 100 ms | 1,000 | 179.8 | 7.7 | 290.6 | 164.5 | 181.9 | 184.5 | 100% |
+
+관찰:
+- 평균 RTT는 연결 간격에 거의 비례한다. 30 ms는 약 1.8배, 100 ms는 약 1.8배이고, 쓰기와 에코 알림이 각각 다음 연결 이벤트를 기다리기 때문으로 보인다(확인하지 않은 해석).
+- 7.5 ms에서는 평균이 26 ms로 2 × 간격(15 ms)보다 약 10 ms 크다. 이 고정 지연이 PC 시리얼·USB 경로인지 동글 펌웨어인지는 구분하지 못했다.
+- 1,000회 모두 응답이 왔다(손실 0).
+
+한계: 측정값에는 PC 시리얼 스택과 USB 경로 시간이 들어 있어서 무선 구간만의 지연이 아니다. 조건당 1회 측정이고, XIAO와 동글 사이 거리·배치는 기록하지 않았다. 거리가 멀어질 때의 RTT는 보지 않았다.
+
 ## 진행 기록
 
 - 2단계 완료 (2026-11-07): `xiao_blink` 업로드, USB 시리얼에 `LED on/off` 출력 확인.
@@ -131,3 +151,4 @@ ASCII 한 줄 `<seq>,<millis>\n`. seq는 송신 순번, millis는 XIAO 시계. X
 - 4·5단계 완료 (2026-11-08): 원인은 `CONFIG_BT_SETTINGS=y`. `n`으로 바꾸고 플래시 → COM 포트 생성, XIAO1에서 `seq,millis` 수신. 격리 과정은 삽질기록.md Task 4 참고.
 - Lv2 처리량 완료 (2026-11-08): `xiao_throughput` 스케치와 `measure/throughput.py`로 패킷 3종 × 연결 간격 5종, 조건당 30초 × 3회 측정. 막힘 3건(연결 직후 요청 충돌, MTU 65 제한, 동글 힙·버퍼 부족)은 삽질기록.md Task 4 참고.
 - Lv2 요구치 비교 완료 (2026-11-09): 스케치에 송신 속도 지정 추가, 64 B × 50패킷/초를 연결 간격 3종 × 60초 × 3회 측정, 손실 0.
+- Lv2 RTT 완료 (2026-11-09): XIAO 스케치에 에코 추가, `measure/rtt.py`로 연결 간격 3종 × 1,000회 측정, 응답률 100%, 평균 26~180 ms.
