@@ -24,7 +24,7 @@ void bench_reset(void);               // drop stored samples
 void bench_start(void);               // remember the current CYCCNT
 void bench_stop(void);                // store (CYCCNT - start) as one sample
 void bench_record(uint32_t cycles);   // store a value computed elsewhere (e.g. ISR period)
-void bench_report(const char *name);  // print n, mean, min, max in cycles and us
+void bench_report(const char *name);  // print n, mean, min, max (cycles, us), index of the max, outlier count
 void bench_dump(void);                // print raw samples as "index,cycles"
 
 #endif

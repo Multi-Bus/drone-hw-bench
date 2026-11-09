@@ -1,0 +1,49 @@
+file,kind,optimization,cache,board,benchmark,n,clock_hz,mean_cycles,mean_us,min_cycles,min_us,max_cycles,max_us,max_at_sample,samples_gt_min_plus_100
+t3_lv2_bench_O0_cacheon_board2.txt,bench,O0,cacheon,2,matmul 4x4 f32,10000,600000000,3202,5.336,3199,5.331,3515,5.858,0,1
+t3_lv2_bench_O0_cacheon_board2.txt,bench,O0,cacheon,2,matmul 12x12 f32,10000,600000000,74186,123.643,74157,123.595,80753,134.588,4001,1239
+t3_lv2_bench_O0_cacheon_board2.txt,bench,O0,cacheon,2,"PID 3-axis, 1 update",10000,600000000,703,1.171,703,1.171,1485,2.475,0,1
+t3_lv2_bench_O0_cacheon_board2.txt,bench,O0,cacheon,2,sinf,10000,600000000,184,0.306,184,0.306,360,0.6,0,3
+t3_lv2_bench_O0_cacheon_board2.txt,bench,O0,cacheon,2,cosf,10000,600000000,204,0.34,204,0.34,374,0.623,0,1
+t3_lv2_bench_O0_cacheon_board2.txt,bench,O0,cacheon,2,sqrtf,10000,600000000,64,0.106,64,0.106,194,0.323,0,1
+t3_lv2_bench_O0_cacheon_board2.txt,bench,O0,cacheon,2,atan2f,10000,600000000,214,0.356,214,0.356,1044,1.74,0,4
+t3_lv2_bench_O0_cacheon_board2.txt,bench,O0,cacheon,2,attitude step (quat integrate + normalize),10000,600000000,268,0.446,268,0.446,903,1.505,0,1
+t3_lv2_bench_O2_cacheon_board2.txt,bench,O2,cacheon,2,matmul 4x4 f32,10000,600000000,704,1.173,704,1.173,885,1.475,0,1
+t3_lv2_bench_O2_cacheon_board2.txt,bench,O2,cacheon,2,matmul 12x12 f32,10000,600000000,13962,23.27,13960,23.266,14738,24.563,0,7
+t3_lv2_bench_O2_cacheon_board2.txt,bench,O2,cacheon,2,"PID 3-axis, 1 update",10000,600000000,161,0.268,161,0.268,531,0.885,0,1
+t3_lv2_bench_O2_cacheon_board2.txt,bench,O2,cacheon,2,sinf,10000,600000000,171,0.285,171,0.285,381,0.635,0,1
+t3_lv2_bench_O2_cacheon_board2.txt,bench,O2,cacheon,2,cosf,10000,600000000,191,0.318,190,0.316,474,0.79,0,1
+t3_lv2_bench_O2_cacheon_board2.txt,bench,O2,cacheon,2,sqrtf,10000,600000000,31,0.051,31,0.051,96,0.16,0,0
+t3_lv2_bench_O2_cacheon_board2.txt,bench,O2,cacheon,2,atan2f,10000,600000000,194,0.323,194,0.323,1062,1.77,0,1
+t3_lv2_bench_O2_cacheon_board2.txt,bench,O2,cacheon,2,attitude step (quat integrate + normalize),10000,600000000,100,0.166,99,0.165,425,0.708,0,1
+t3_lv2_bench_O3_cacheoff_board2.txt,bench,O3,cacheoff,2,matmul 4x4 f32,10000,600000000,3359,5.598,3357,5.595,3815,6.358,2491,55
+t3_lv2_bench_O3_cacheoff_board2.txt,bench,O3,cacheoff,2,matmul 12x12 f32,10000,600000000,47748,79.58,47716,79.526,48180,80.3,102,795
+t3_lv2_bench_O3_cacheoff_board2.txt,bench,O3,cacheoff,2,"PID 3-axis, 1 update",10000,600000000,1551,2.585,1549,2.581,2003,3.338,8796,32
+t3_lv2_bench_O3_cacheoff_board2.txt,bench,O3,cacheoff,2,sinf,10000,600000000,614,1.023,613,1.021,1002,1.67,3805,9
+t3_lv2_bench_O3_cacheoff_board2.txt,bench,O3,cacheoff,2,cosf,10000,600000000,669,1.115,668,1.113,1065,1.775,5096,10
+t3_lv2_bench_O3_cacheoff_board2.txt,bench,O3,cacheoff,2,sqrtf,10000,600000000,233,0.388,232,0.386,600,1.0,4844,5
+t3_lv2_bench_O3_cacheoff_board2.txt,bench,O3,cacheoff,2,atan2f,10000,600000000,1921,3.201,1919,3.198,2319,3.865,359,33
+t3_lv2_bench_O3_cacheoff_board2.txt,bench,O3,cacheoff,2,attitude step (quat integrate + normalize),10000,600000000,782,1.303,781,1.301,1151,1.918,4172,13
+t3_lv2_bench_O3_cacheon_board2.txt,bench,O3,cacheon,2,matmul 4x4 f32,10000,600000000,260,0.433,260,0.433,935,1.558,0,2
+t3_lv2_bench_O3_cacheon_board2.txt,bench,O3,cacheon,2,matmul 4x4 f32 (CMSIS-DSP),10000,600000000,142,0.236,141,0.235,630,1.05,0,1
+t3_lv2_bench_O3_cacheon_board2.txt,bench,O3,cacheon,2,matmul 12x12 f32,10000,600000000,2846,4.743,2846,4.743,4772,7.953,0,2
+t3_lv2_bench_O3_cacheon_board2.txt,bench,O3,cacheon,2,matmul 12x12 f32 (CMSIS-DSP),10000,600000000,2472,4.12,2467,4.111,3832,6.386,0,1
+t3_lv2_bench_O3_cacheon_board2.txt,bench,O3,cacheon,2,"PID 3-axis, 1 update",10000,600000000,139,0.231,139,0.231,753,1.255,0,1
+t3_lv2_bench_O3_cacheon_board2.txt,bench,O3,cacheon,2,sinf,10000,600000000,171,0.285,171,0.285,396,0.66,0,1
+t3_lv2_bench_O3_cacheon_board2.txt,bench,O3,cacheon,2,cosf,10000,600000000,191,0.318,191,0.318,450,0.75,0,1
+t3_lv2_bench_O3_cacheon_board2.txt,bench,O3,cacheon,2,sqrtf,10000,600000000,31,0.051,31,0.051,128,0.213,5112,0
+t3_lv2_bench_O3_cacheon_board2.txt,bench,O3,cacheon,2,atan2f,10000,600000000,196,0.326,195,0.325,997,1.661,0,1
+t3_lv2_bench_O3_cacheon_board2.txt,bench,O3,cacheon,2,attitude step (quat integrate + normalize),10000,600000000,98,0.163,98,0.163,411,0.685,0,1
+t3_lv2_isr_O3_cacheon_board2.txt,isr,O3,cacheon,2,matmul 4x4 f32,10000,600000000,261,0.435,260,0.433,949,1.581,0,1
+t3_lv2_isr_O3_cacheon_board2.txt,isr,O3,cacheon,2,matmul 4x4 f32 (CMSIS-DSP),10000,600000000,142,0.236,141,0.235,747,1.245,0,1
+t3_lv2_isr_O3_cacheon_board2.txt,isr,O3,cacheon,2,matmul 12x12 f32,10000,600000000,2846,4.743,2846,4.743,4770,7.95,0,1
+t3_lv2_isr_O3_cacheon_board2.txt,isr,O3,cacheon,2,matmul 12x12 f32 (CMSIS-DSP),10000,600000000,2471,4.118,2466,4.11,3841,6.401,0,1
+t3_lv2_isr_O3_cacheon_board2.txt,isr,O3,cacheon,2,"PID 3-axis, 1 update",10000,600000000,139,0.231,139,0.231,781,1.301,0,1
+t3_lv2_isr_O3_cacheon_board2.txt,isr,O3,cacheon,2,sinf,10000,600000000,171,0.285,171,0.285,414,0.69,0,2
+t3_lv2_isr_O3_cacheon_board2.txt,isr,O3,cacheon,2,cosf,10000,600000000,191,0.318,191,0.318,408,0.68,0,2
+t3_lv2_isr_O3_cacheon_board2.txt,isr,O3,cacheon,2,sqrtf,10000,600000000,31,0.051,31,0.051,132,0.22,5009,1
+t3_lv2_isr_O3_cacheon_board2.txt,isr,O3,cacheon,2,atan2f,10000,600000000,298,0.496,296,0.493,1101,1.835,0,1
+t3_lv2_isr_O3_cacheon_board2.txt,isr,O3,cacheon,2,attitude step (quat integrate + normalize),10000,600000000,98,0.163,97,0.161,391,0.651,0,1
+t3_lv2_isr_O3_cacheon_board2.txt,isr,O3,cacheon,2,ISR period (target 600000 cycles = 1 ms),10000,600000000,599999,999.998,599895,999.825,600034,1000.056,4973,9987
+t3_lv2_isr_O3_cacheon_board2.txt,isr,O3,cacheon,2,period deviation |period - 600000| (jitter),10000,600000000,0,0.0,0,0.0,105,0.175,0,1
+t3_lv2_isr_O3_cacheon_board2.txt,isr,O3,cacheon,2,ISR execution time (PID + 12x12 matmul),10000,600000000,3044,5.073,3037,5.061,3119,5.198,9557,0
+t3_lv2_isr_O3_cacheon_board2.txt,isr,O3,cacheon,2,"interrupt latency (CNT at handler start, in CPU cycles)",10000,600000000,43,0.071,43,0.071,79,0.131,877,0

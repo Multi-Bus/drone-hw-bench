@@ -1,0 +1,55 @@
+
+ T3 bench step 2, clock = 600000000 Hz
+
+== T3 Lv2 benchmarks, -O0 build (no optimization) ==
+I-cache on, D-cache on
+matmul 4x4 f32: n=10000, clock=600000000 Hz
+  mean       3202 cycles  5.336 us
+  min        3199 cycles  5.331 us
+  max        3515 cycles  5.858 us
+  max at sample #0
+  samples > min+100 cycles: 1 of 10000
+matmul 12x12 f32: n=10000, clock=600000000 Hz
+  mean      74186 cycles  123.643 us
+  min       74157 cycles  123.595 us
+  max       80753 cycles  134.588 us
+  max at sample #4001
+  samples > min+100 cycles: 1239 of 10000
+PID 3-axis, 1 update: n=10000, clock=600000000 Hz
+  mean        703 cycles  1.171 us
+  min         703 cycles  1.171 us
+  max        1485 cycles  2.475 us
+  max at sample #0
+  samples > min+100 cycles: 1 of 10000
+sinf: n=10000, clock=600000000 Hz
+  mean        184 cycles  0.306 us
+  min         184 cycles  0.306 us
+  max         360 cycles  0.600 us
+  max at sample #0
+  samples > min+100 cycles: 3 of 10000
+cosf: n=10000, clock=600000000 Hz
+  mean        204 cycles  0.340 us
+  min         204 cycles  0.340 us
+  max         374 cycles  0.623 us
+  max at sample #0
+  samples > min+100 cycles: 1 of 10000
+sqrtf: n=10000, clock=600000000 Hz
+  mean         64 cycles  0.106 us
+  min          64 cycles  0.106 us
+  max         194 cycles  0.323 us
+  max at sample #0
+  samples > min+100 cycles: 1 of 10000
+atan2f: n=10000, clock=600000000 Hz
+  mean        214 cycles  0.356 us
+  min         214 cycles  0.356 us
+  max        1044 cycles  1.740 us
+  max at sample #0
+  samples > min+100 cycles: 4 of 10000
+attitude step (quat integrate + normalize): n=10000, clock=600000000 Hz
+  mean        268 cycles  0.446 us
+  min         268 cycles  0.446 us
+  max         903 cycles  1.505 us
+  max at sample #0
+  samples > min+100 cycles: 1 of 10000
+checksum = 8512
+== done ==

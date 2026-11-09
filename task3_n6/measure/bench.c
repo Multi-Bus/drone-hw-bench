@@ -3,6 +3,8 @@
 #include "stm32n6xx.h"   // DCB, DWT, SystemCoreClock
 #include <stdio.h>
 
+#define BENCH_OUTLIER_MARGIN 100U   // a sample counts as an outlier if it is more than this many cycles above the minimum
+
 static uint32_t samples[BENCH_MAX_SAMPLES];   // one measurement per entry, in cycles
 static uint32_t count;                        // number of stored samples
 static uint32_t t0;                           // CYCCNT value at bench_start()
@@ -60,11 +62,12 @@ void bench_report(const char *name)
 
   uint32_t min = samples[0];
   uint32_t max = samples[0];
+  uint32_t max_idx = 0;
   uint64_t sum = 0;   // 10,000 samples of up to 2^32 cycles do not fit in 32 bits
   for (uint32_t i = 0; i < count; i++) {
     uint32_t v = samples[i];
     if (v < min) min = v;
-    if (v > max) max = v;
+    if (v > max) { max = v; max_idx = i; }
     sum += v;
   }
 
@@ -72,6 +75,14 @@ void bench_report(const char *name)
   print_line("mean", (uint32_t)(sum / count));
   print_line("min", min);
   print_line("max", max);   // real-time decisions use the maximum
+  printf("  max at sample #%lu\r\n", (unsigned long)max_idx);   // #0 = first run (cold cache)
+
+  uint32_t outliers = 0;
+  for (uint32_t i = 0; i < count; i++) {
+    if (samples[i] > min + BENCH_OUTLIER_MARGIN) outliers++;
+  }
+  printf("  samples > min+%u cycles: %lu of %lu\r\n", (unsigned)BENCH_OUTLIER_MARGIN,
+         (unsigned long)outliers, (unsigned long)count);
 }
 
 void bench_dump(void)
