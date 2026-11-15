@@ -98,7 +98,7 @@ TWR 담당자가 쓰는 드라이버의 platform 인터페이스(`platform/dw300
 
 ## 드라이버 + 인터럽트 시험 (`T2_UWB_ISR/`, 보드 1, 2026-11-09)
 
-어댑터를 실제 br101 드라이버(v08.02.02, 커밋 `67dfbb7`)와 연결해서 `dwt_isr()`가 EXTI12 인터럽트로 불리는지 확인했다. 프로젝트와 준비 방법은 [`T2_UWB_ISR/README.md`](T2_UWB_ISR/README.md), 원본 로그는 [`logs/t2_lv2_isr_board1.txt`](logs/t2_lv2_isr_board1.txt) (보드 1, Tera Term은 COM5. 로그 파일에는 COM 번호가 없다).
+어댑터를 실제 br101 드라이버(v08.02.02, 커밋 `67dfbb7`)와 연결해서 `dwt_isr()`가 EXTI12 인터럽트로 불리는지 확인했다. 프로젝트와 준비 방법은 [`T2_UWB_ISR/README.md`](T2_UWB_ISR/README.md), 원본 로그는 [`logs/t2_lv2_isr_board1.txt`](logs/t2_lv2_isr_board1.txt) (보드 1. Tera Term은 COM5이고 COM5가 보드 1이라는 것을 사용자가 확인함. 로그 파일에는 COM 번호가 없다).
 
 | 항목 | 결과 |
 | --- | --- |
