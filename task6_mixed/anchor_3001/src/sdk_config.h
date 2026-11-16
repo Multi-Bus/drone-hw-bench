@@ -1,0 +1,29 @@
+/* Minimal nRF5 SDK configuration: only the drivers this firmware uses. */
+#ifndef SDK_CONFIG_H
+#define SDK_CONFIG_H
+
+#define NRFX_SPIM_ENABLED 1
+#define NRFX_SPIM0_ENABLED 1
+#define NRFX_SPIM_MISO_PULL_CFG 1
+#define NRFX_SPIM_DEFAULT_CONFIG_IRQ_PRIORITY 6
+#define NRFX_SPIM_EXTENDED_ENABLED 0
+
+#define NRFX_GPIOTE_ENABLED 1
+#define NRFX_GPIOTE_CONFIG_NUM_OF_LOW_POWER_EVENTS 1
+#define NRFX_GPIOTE_CONFIG_IRQ_PRIORITY 6
+
+#define NRFX_PRS_ENABLED 0
+
+/* nrf_log is compiled out; nrfx headers still include it */
+#define NRF_LOG_ENABLED 0
+#define NRFX_SPIM_CONFIG_LOG_ENABLED 0
+#define NRFX_GPIOTE_CONFIG_LOG_ENABLED 0
+
+/* SEGGER RTT (output of this firmware) */
+#define SEGGER_RTT_CONFIG_BUFFER_SIZE_UP 4096
+#define SEGGER_RTT_CONFIG_MAX_NUM_UP_BUFFERS 2
+#define SEGGER_RTT_CONFIG_BUFFER_SIZE_DOWN 16
+#define SEGGER_RTT_CONFIG_MAX_NUM_DOWN_BUFFERS 2
+#define SEGGER_RTT_CONFIG_DEFAULT_MODE 0
+
+#endif

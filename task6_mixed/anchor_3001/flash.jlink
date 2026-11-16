@@ -1,0 +1,6 @@
+r
+erase
+loadfile build/anchor_3001.hex
+r
+g
+exit

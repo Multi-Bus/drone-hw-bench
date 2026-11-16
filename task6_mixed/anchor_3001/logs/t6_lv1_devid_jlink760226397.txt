@@ -1,0 +1,53 @@
+
+== T6 Lv1: DWM3001CDK Device ID (br101 driver DW3XXX Device Driver Version 08.02.02) ==
+I DW3000: HW Init (RESET:25 WAKEUP:-1 IRQ:34)
+I DW3000: SPI Init (MOSI:8 MISO:29 CLK:3 CS:38)
+dw3000_hw_init: 0 (0 = RSTn released and SPI ready)
+I DW3000: HW reset
+#01 raw id=0xDECA0302 OK
+I DW3000: HW reset
+#02 raw id=0xDECA0302 OK
+I DW3000: HW reset
+#03 raw id=0xDECA0302 OK
+I DW3000: HW reset
+#04 raw id=0xDECA0302 OK
+I DW3000: HW reset
+#05 raw id=0xDECA0302 OK
+I DW3000: HW reset
+#06 raw id=0xDECA0302 OK
+I DW3000: HW reset
+#07 raw id=0xDECA0302 OK
+I DW3000: HW reset
+#08 raw id=0xDECA0302 OK
+I DW3000: HW reset
+#09 raw id=0xDECA0302 OK
+I DW3000: HW reset
+#10 raw id=0xDECA0302 OK
+I DW3000: HW reset
+#11 raw id=0xDECA0302 OK
+I DW3000: HW reset
+#12 raw id=0xDECA0302 OK
+I DW3000: HW reset
+#13 raw id=0xDECA0302 OK
+I DW3000: HW reset
+#14 raw id=0xDECA0302 OK
+I DW3000: HW reset
+#15 raw id=0xDECA0302 OK
+I DW3000: HW reset
+#16 raw id=0xDECA0302 OK
+I DW3000: HW reset
+#17 raw id=0xDECA0302 OK
+I DW3000: HW reset
+#18 raw id=0xDECA0302 OK
+I DW3000: HW reset
+#19 raw id=0xDECA0302 OK
+I DW3000: HW reset
+#20 raw id=0xDECA0302 OK
+raw reads: 20/20 = 0xDECA0302
+I DW3000: HW reset
+I DW3000: WAKEUP CS
+dwt_probe: 0 (DWT_SUCCESS = 0)
+dwt_initialise: 0
+dwt_readdevid: 0xDECA0302 OK
+verdict: PASS
+== done ==
