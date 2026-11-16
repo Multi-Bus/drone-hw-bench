@@ -159,12 +159,22 @@ int main(void)
   int rc = dw3000_hw_init();
   printf("dw3000_hw_init: %d (0 = RSTn released within 1 s)\r\n", rc);
   steps_ok &= (rc == 0);
+  if (!steps_ok)
+  {
+    printf("hardware start-up failed\r\nverdict: FAIL\r\n");
+    Error_Handler();
+  }
 
   dw3000_spi_speed_slow();
   dw3000_hw_reset();
   rc = dwt_probe((struct dwt_probe_s *)&dw3000_probe_interf);
   printf("dwt_probe: %d (DWT_SUCCESS = %d)\r\n", rc, (int)DWT_SUCCESS);
   steps_ok &= (rc == (int)DWT_SUCCESS);
+  if (!steps_ok)
+  {
+    printf("driver probe failed\r\nverdict: FAIL\r\n");
+    Error_Handler();
+  }
 
   /* Register reads through the driver (dwt_readdevid, dwt_checkidlerc, ...) read dw->priv, which only
      dwt_initialise() sets. Before it they dereference NULL, so wait for IDLE_RC with our own SPI read
@@ -173,13 +183,27 @@ int main(void)
   uint32_t st = 0, en = 0;
   do
   {
-    (void)uwb_port_read_status(&st, &en);
+    rc = uwb_port_read_status(&st, &en);
+    if (rc != UWB_OK)
+    {
+      break;
+    }
   } while (((st & (1UL << 24)) == 0U) && (HAL_GetTick() - t0) < 200U);
   printf("RCINIT (SYS_STATUS bit24) = %lu after %lu ms\r\n", (unsigned long)((st >> 24) & 1U), (unsigned long)(HAL_GetTick() - t0));
+  if (rc != UWB_OK || (st & (1UL << 24)) == 0U)
+  {
+    printf("RCINIT read failed or timed out\r\nverdict: FAIL\r\n");
+    Error_Handler();
+  }
 
   rc = dwt_initialise(DWT_DW_INIT);
   printf("dwt_initialise: %d (DWT_SUCCESS = %d), SPI clock now %lu Hz\r\n", rc, (int)DWT_SUCCESS, (unsigned long)uwb_port_spi_hz());
   steps_ok &= (rc == (int)DWT_SUCCESS);
+  if (!steps_ok)
+  {
+    printf("driver initialise failed\r\nverdict: FAIL\r\n");
+    Error_Handler();
+  }
 
   uint32_t id = dwt_readdevid();
   printf("dwt_readdevid: 0x%08lX  %s\r\n", (unsigned long)id, (id == 0xDECA0302UL) ? "OK" : "UNEXPECTED");
@@ -211,8 +235,9 @@ int main(void)
            (unsigned long)dw3000_hw_stats.isr_entries, (unsigned long)dw3000_hw_stats.hook_calls,
            (unsigned long)spirdy_cb_count, (unsigned long)spirdy_cb_status,
            (unsigned long)dw3000_hw_stats.max_depth, (unsigned long)dw3000_hw_stats.last_isr_cycles);
-    int a_ok = (dw3000_hw_stats.isr_entries >= 1U) && (spirdy_cb_count == 1U) && (uwb_port_irq_level() == 0) &&
-               (dw3000_hw_stats.max_depth == 1U);
+    int a_ok = (dw3000_hw_stats.isr_entries == 1U) && (dw3000_hw_stats.hook_calls == 1U) &&
+               (spirdy_cb_count == 1U) && (uwb_port_irq_level() == 0) &&
+               (dw3000_hw_stats.max_depth == 1U) && (dw3000_hw_stats.loop_limit_hits == 0U);
     printf("A: %s\r\n", a_ok ? "PASS" : "FAIL");
 
     /* B) real rising edges: hardware reset with the interrupt enabled */
@@ -231,7 +256,7 @@ int main(void)
       decaIrqStatus_t m = decamutexon();
       (void)uwb_port_read_status(&st, &en);
       decamutexoff(m);
-      int ok = (de >= 1U) && (dc == 1U) && (irq == 0);
+      int ok = (de == 1U) && (dh == 1U) && (dc == 1U) && (irq == 0);
       if (ok)
       {
         b_ok++;

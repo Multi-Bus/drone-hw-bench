@@ -1,5 +1,7 @@
 # T2_UWB_ISR: DW3000 드라이버 + 인터럽트 시험 (Task 2 Lv2, 보드 1)
 
+> 2026-11-16 보완: 시작 실패 시 후속 드라이버 접근을 중단하고, A/B의 PASS 조건에 handler/hook/callback 정확히 1회를 강제했다. 보완 소스는 ARM 객체 컴파일만 확인했으며 보드 재시험은 아직이다. 기존 로그는 보완 전 시험 기록이다. 다음 작업은 [인수인계 문서](../../lv2/docs/HANDOFF_2026-11-16.md)를 참고한다.
+
 `T2_UWB_SPI`의 어댑터(`uwb_port`, `dw3000_spi`, `dw3000_hw`, `deca_port`)를 실제 br101 드라이버와 연결해서, `dwt_isr()`가 EXTI12 인터럽트로 불리고 `SPIRDY`가 처리되어 IRQ가 내려가는지 확인하는 CubeIDE 프로젝트다. 결과는 [`../README.md`](../README.md)의 "드라이버 + 인터럽트 시험", 원본 로그는 [`../logs/t2_lv2_isr_board1.txt`](../logs/t2_lv2_isr_board1.txt).
 
 - 시험 코드: `FSBL/Src/main.c` (드라이버 시작 → A) IRQ가 High인 채 인터럽트 켜기 → B) 하드웨어 리셋 20회).
