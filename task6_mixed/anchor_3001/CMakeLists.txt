@@ -14,8 +14,10 @@ if(NOT EXISTS "${DRV}/dwt_uwb_driver/deca_device_api.h")
   message(FATAL_ERROR "Prepare driver/ first (see README.md)")
 endif()
 
+# Test program: devid (Lv1 step 1) or fast_irq (8 MHz SPI + interrupt)
+set(T6_TEST "fast_irq" CACHE STRING "devid | fast_irq")
 add_executable(anchor_3001.elf
-  src/main.c
+  src/test_${T6_TEST}.c
   # br101 driver v08.02.02 (same file set as Task 2 T2_UWB_ISR)
   ${DRV}/dwt_uwb_driver/deca_interface.c
   ${DRV}/dwt_uwb_driver/deca_rsl.c
