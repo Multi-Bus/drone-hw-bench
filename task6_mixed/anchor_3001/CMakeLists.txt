@@ -15,9 +15,12 @@ if(NOT EXISTS "${DRV}/dwt_uwb_driver/deca_device_api.h")
 endif()
 
 # Test program: devid (Lv1 step 1) or fast_irq (8 MHz SPI + interrupt)
-set(T6_TEST "fast_irq" CACHE STRING "devid | fast_irq")
+set(T6_TEST "twr" CACHE STRING "devid | fast_irq | twr")
+set(T6_ROLE "responder" CACHE STRING "twr only: responder (anchor) | initiator (tag 0x0002)")
+set(T6_ANCHOR_ADDR "0x0001" CACHE STRING "twr responder only: anchor address (0x0001, 0x0003, ...)")
 add_executable(anchor_3001.elf
   src/test_${T6_TEST}.c
+  src/log.c
   # br101 driver v08.02.02 (same file set as Task 2 T2_UWB_ISR)
   ${DRV}/dwt_uwb_driver/deca_interface.c
   ${DRV}/dwt_uwb_driver/deca_rsl.c
@@ -26,7 +29,6 @@ add_executable(anchor_3001.elf
   ${DRV}/platform/deca_compat.c
   # br101 nRF5 SDK platform port (unchanged)
   ${DRV}/platform/nrf-sdk/deca_port.c
-  ${DRV}/platform/nrf-sdk/dw3000_hw.c
   ${DRV}/platform/nrf-sdk/dw3000_spi.c
   # nRF5 SDK
   ${NRF5_SDK}/modules/nrfx/mdk/gcc_startup_nrf52833.S
@@ -37,6 +39,31 @@ add_executable(anchor_3001.elf
   ${NRF5_SDK}/external/segger_rtt/SEGGER_RTT.c
   ${NRF5_SDK}/external/segger_rtt/SEGGER_RTT_printf.c
 )
+
+# libdeca 226f3db (same commit as the Task 2 tag), nRF5 SDK platform task (app_scheduler)
+if(T6_TEST STREQUAL "twr")
+  # corrected interrupt port (see src/dw3000_hw_t6.c); devid/fast_irq keep the original file they were tested with
+  target_sources(anchor_3001.elf PRIVATE src/dw3000_hw_t6.c)
+else()
+  target_sources(anchor_3001.elf PRIVATE ${DRV}/platform/nrf-sdk/dw3000_hw.c)
+endif()
+if(T6_TEST STREQUAL "twr")
+  set(LD ${CMAKE_CURRENT_SOURCE_DIR}/libdeca)
+  if(NOT EXISTS "${LD}/ranging.c")
+    message(FATAL_ERROR "Prepare libdeca/ first (see README.md)")
+  endif()
+  target_sources(anchor_3001.elf PRIVATE
+    ${LD}/dwhw.c ${LD}/dwmac.c ${LD}/dwmac_irq.c ${LD}/dwphy.c ${LD}/dwtime.c ${LD}/ranging.c
+    ${LD}/dwproto.c ${LD}/blink.c ${LD}/sync.c ${LD}/mac802154.c ${LD}/dwutil.c
+    ${LD}/platform/nrf-sdk/dwmac_task.c
+    ${NRF5_SDK}/components/libraries/scheduler/app_scheduler.c)
+  target_include_directories(anchor_3001.elf PRIVATE ${LD} ${NRF5_SDK}/components/libraries/scheduler)
+  if(T6_ROLE STREQUAL "initiator")
+    target_compile_definitions(anchor_3001.elf PRIVATE T6_ROLE_INITIATOR=1)
+  else()
+    target_compile_definitions(anchor_3001.elf PRIVATE T6_ROLE_INITIATOR=0 T6_ANCHOR_ADDR=${T6_ANCHOR_ADDR})
+  endif()
+endif()
 
 target_include_directories(anchor_3001.elf PRIVATE
   src

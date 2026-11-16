@@ -14,6 +14,11 @@
 
 #define NRFX_PRS_ENABLED 0
 
+/* libdeca nRF5 SDK platform defers DW3000 events to app_scheduler */
+#define APP_SCHEDULER_ENABLED 1
+#define APP_SCHEDULER_WITH_PAUSE 0
+#define APP_SCHEDULER_WITH_PROFILER 0
+
 /* nrf_log is compiled out; nrfx headers still include it */
 #define NRF_LOG_ENABLED 0
 #define NRFX_SPIM_CONFIG_LOG_ENABLED 0

@@ -7,7 +7,8 @@
 | `T6_TEST` | 파일 | 내용 |
 | --- | --- | --- |
 | `devid` | `src/test_devid.c` | Lv1 1단계: Device ID 읽기 |
-| `fast_irq` (기본) | `src/test_fast_irq.c` | Lv1 A단계: SPI 8 MHz, 인터럽트(`dwt_isr`) |
+| `fast_irq` | `src/test_fast_irq.c` | Lv1 A단계: SPI 8 MHz, 인터럽트(`dwt_isr`) |
+| `twr` (기본) | `src/test_twr.c` + `src/dw3000_hw_t6.c` | Lv1 B단계: libdeca DS-TWR. `-DT6_ROLE=responder`(앵커, 주소 `-DT6_ANCHOR_ADDR`, 기본 `0x0001`) 또는 `initiator`(태그 `0x0002`, `0x0001`에 거리를 물음) |
 
 ## 구성
 
@@ -20,7 +21,7 @@
 | WAKEUP | SDK는 P1.19로 적었지만 nRF52833 포트 1은 P1.00~P1.09뿐이라 사용하지 않음(-1). 포트가 CS로 깨운다 |
 | 출력 | SEGGER RTT 채널 0 (J-Link RTT Viewer) |
 
-드라이버 소스는 라이선스 혼재로 repo에 넣지 않는다 (`driver/`는 `.gitignore`).
+드라이버와 libdeca 소스는 라이선스 혼재로 repo에 넣지 않는다 (`driver/`, `libdeca/`는 `.gitignore`).
 
 ## 준비
 
@@ -32,6 +33,13 @@ cp -r /tmp/br101_decadriver/dwt_uwb_driver /tmp/br101_decadriver/platform driver
 cd driver && git apply ../../../task2_evb_stm32/lv2_spi/T2_UWB_ISR/driver_patches/0001-dw3000_device-export-ull-symbols.patch
 ```
 
+`twr`에는 libdeca도 필요하다 (Task 2 태그와 같은 커밋 `226f3db3bc4ef2be9c143e8340a3851cd571cce9`, 수정 없음):
+
+```bash
+git clone https://github.com/br101/libdeca.git libdeca
+git -C libdeca checkout 226f3db3bc4ef2be9c143e8340a3851cd571cce9
+```
+
 도구: Arm GNU Toolchain 12.2.rel1, CMake, Ninja, J-Link.
 
 ## 빌드
@@ -41,7 +49,9 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DT6_TEST=fast_irq -DNRF5_
 cmake --build build
 ```
 
-결과: `build/anchor_3001.hex`.
+결과: `build/anchor_3001.hex`. TWR은 역할마다 빌드 폴더를 나눈다 (예: `-B build_anchor -DT6_ROLE=responder`, `-B build_tag -DT6_ROLE=initiator`).
+
+빌드 폴더가 OneDrive 안에 있으면 링크가 `ld returned 5 exit status`로 실패할 때가 있었다 (`build_responder` 폴더에서만 반복, 출력 `.elf`가 0바이트). 폴더 이름을 바꾸니 됐다. 원인은 확인하지 못했다 (OneDrive 잠금으로 추정).
 
 ## 올리기
 
@@ -93,3 +103,40 @@ J-Link RTT Viewer (Device `nRF52833_xxAA`, SWD, 4000 kHz)를 열고 보드를 �
 - 인터럽트를 켜기 전에는 IRQ 핀이 0으로 읽혔다 (`before enabling: IRQ=0`). 핀이 아직 입력으로 설정되지 않아 입력 버퍼가 끊긴 상태로 보인다 (추정). 실제 상태는 `SYS_STATUS`의 `SPIRDY`(`0x01800005`)로 확인했다.
 - 플랫폼 포트의 인터럽트 핸들러는 IRQ가 High인 동안 `dwt_isr()`를 무한 반복한다 (`platform/nrf-sdk/dw3000_hw.c`). 이 시험에서는 매번 한 번에 내려갔다.
 - 인터럽트 시험은 2 MHz에서 했다. 8 MHz는 폴링 읽기·쓰기만 시험했다. 한 번의 전원 투입에서 얻은 결과다.
+
+## 결과 3: libdeca DS-TWR, 3001 두 개 (`twr`, 2026-11-16)
+
+앵커(responder `0x0001`) = 보드 J-Link `760226397`, 태그(initiator `0x0002`) = 보드 J-Link `760226502`. 두 번째 보드도 지우기 전에 플래시와 UICR을 백업했다 (`종합설계/ext/backup_3001_760226502/`).
+
+설정은 Task 2 태그(`task2_evb_stm32/lv2/uwb_app/uwb_app.c`)와 같다: libdeca 기본 PHY (채널 9, 6.8 Mbps, PRF 64 MHz, 프리앰블 64, 코드 11), PAN `0xDECA`, 처리 지연 2000 µs, 보고 메시지 켬, 안테나 딜레이 libdeca 기본값 16368 (보정 전). 태그는 100 ms마다 `twr_start(0x0001)`. 시작 순서는 Task 2 `HANDOFF_2026-11-16.md`대로 드라이버·libdeca 초기화를 먼저 하고 인터럽트를 마지막에 켠다.
+
+| 배치 | 시간 | 태그 결과 | 거리 (태그 기준) | 원본 |
+| --- | --- | --- | --- | --- |
+| **약 1 m** (앵커만 고정, 태그는 손으로 들고 있었음. 거리를 재지 않음) | 32 s | 시작 300회 중 성공 299, 실패 0 (STAT 기준). 재시도·타임아웃 로그 20줄 | n = 318, 평균 **107.5 cm**, 표준편차 5.1, 최소 92, 중앙 107, 최대 127 | `logs/t6_lv1_twr_1m_*.txt` |
+| 두 보드를 책상 위에 가까이 둠 (거리 기록 안 함) | 30 s | 시작 300회 중 성공 0, 실패 299 | ToF가 모두 음수 (−9 ~ −38 DTU) → libdeca가 0 cm로 처리하고 재시도 | `logs/t6_lv1_twr_close_*.txt` |
+
+- 앵커도 같은 거리를 계산한다 (1 m에서 n = 328, 평균 107.3 cm). 태그 값은 앵커가 보낸 보고 메시지 값이다.
+- 태그를 손으로 들고 있어서 실제 거리가 1.00 m가 아니었다. 그래서 평균 107.5 cm를 오차나 보정값 근거로 쓰지 않는다. 이 시험이 보여 주는 것은 3001 두 개 사이에서 libdeca DS-TWR이 동작한다는 것(300회 중 299 성공)까지다. 표준편차에도 손 떨림이 섞여 있다.
+- 가까이 둔 시험에서는 20초쯤부터 앵커 로그가 크게 줄었다. 1 m 시험(32초)에서는 같은 현상이 없었다. 원인은 확인하지 못했다.
+
+### 플랫폼 포트 수정 (`src/dw3000_hw_t6.c`)
+
+br101 `platform/nrf-sdk/dw3000_hw.c`의 `dw3000_hw_interrupt_enable/disable/is_enabled`는 IRQ **핀 번호**(34)를 `nrf_gpiote_int_enable/disable/is_enabled()`에 넘긴다. 이 함수들은 `INTENSET/INTENCLR`에 쓰는 **채널 비트마스크**를 받는다 (nRF5 SDK `hal/nrf_gpiote.h`). 34 = IN1|IN5라서 실제 채널(IN0)은 막히지 않고, 드라이버의 `decamutexon()`이 SPI 전송 중 DW3000 인터럽트를 막지 못한다 (코드로 확인, 이로 인한 오동작을 직접 관찰하지는 않았다). TWR 빌드는 이 파일 대신 `src/dw3000_hw_t6.c`를 쓴다:
+
+- 뮤텍스는 NVIC에서 `GPIOTE_IRQn`을 막는다. 막힌 동안 생긴 에지는 `EVENTS_IN`에 남아 있다가 풀릴 때 처리된다.
+- `dw3000_hw_init_interrupt()`가 IRQ가 이미 High면 한 번 처리한다 (A단계에서 찾은 문제).
+- 핸들러 반복은 8회로 제한하고 넘으면 센다 (`irq_loop_limit`, 이번 시험 0회).
+- `devid`, `fast_irq`는 시험했던 원래 파일을 그대로 쓴다.
+
+### 안테나 딜레이 보정에 대해
+
+libdeca는 런타임 설정(`dwphy_set_antenna_delay()` → `dwt_settx/rxantennadelay`)과 별개로, 메시지에 넣는 송신 시각에 **컴파일 상수** `DWPHY_ANTENNA_DELAY`(`dwphy.h`, 16368)를 더한다 (`ranging.c:170, 206`, `sync.c`). 그래서 보드마다 다른 보정값을 쓰려면 런타임 값만 바꿔서는 안 되고 이 상수도 맞춰야 한다. libdeca를 고치거나 빌드 정의로 바꾸는 방법은 Task 2 태그와 같이 정해야 해서 아직 하지 않았다.
+
+## 현재 보드 상태 (2026-11-16, 3001↔3000 시험 대기)
+
+| 보드 (J-Link) | 펌웨어 | 빌드 |
+| --- | --- | --- |
+| `760226397` | `twr` responder, 앵커 **`0x0001`** | `-B build_anchor -DT6_ROLE=responder` |
+| `760226502` | `twr` responder, 앵커 **`0x0003`** | `-B build_anchor3 -DT6_ROLE=responder -DT6_ANCHOR_ADDR=0x0003` |
+
+두 보드 모두 시작 후 `listening`과 MAC 주소를 RTT로 출력하는 것을 확인했다. Task 2 태그(N6, `0x0002`)는 `0x0001`에만 거리를 묻는다 (`uwb_app_start_ds_twr(0x0001)`). 두 앵커가 같은 주소면 둘 다 응답해 충돌하므로 두 번째 앵커는 `0x0003`으로 했다. 3001끼리 시험하려면 한 보드를 `initiator`로 다시 올린다.
