@@ -121,6 +121,29 @@ python task2_evb_stm32/lv2/tools/log_twr.py --port <태그 COM> --samples 300 --
   - 새 이미지에서 `FAIL`이 이어졌다(첫 시도만 `OK`). 앵커 A는 교환 한 번을 마친 뒤 수신을 멈추는 모습이 반복됐다(`# HEALTH entries`가 늘지 않고 `state=00030000`). **원인은 모른다.** 후보: (1) 보드 간 거리가 너무 가깝거나 안테나 지연 16400의 영향으로 계산된 거리가 0 이하가 되면 libdeca(`ranging.c`)가 이를 실패로 보고 재시도한다 — 거리를 약 1 m로 띄워 확인 전, (2) 존재하지 않는 peer(3001이 꺼진 상태)에게 묻는 시도가 이어지는 교환에 영향을 주는지 확인 전. 기존 단일 상대 펌웨어로도 한때 880회 연속 실패한 적이 있어 이 모드만의 문제로 보지는 않는다.
   - 개발 모드(JP2 2–3)에서 RAM에 올려 실행하면 AP1 접속이 막히고 CPU 재개가 불안정했다. 새 이미지는 서명(`STM32_SigningTool_CLI -nk -of 0x80000000 -t fsbl -hv 2.3 -align`)해서 외부 플래시 `0x70000000`에 쓰고(`-el ...stldr -w ... -v`, 쓰기 전에 앞 128 KiB 백업) JP2를 1–2로 되돌려 부팅하는 편이 안정적이었다.
 
+## 앵커가 둘 이상일 때 수신이 멈추는 문제와 수정 (ARFE 인터럽트, 2026-11-17)
+
+**증상:** 태그가 앵커 두 개(주소 1, 3)에 번갈아 묻기 시작하면 앵커 A(주소 1)가 첫 교환 뒤 더 이상 받지 못하고(`# HEALTH entries`가 늘지 않고 `state=00030000`) 태그는 `FAIL`만 낸다. 앞서 단일 상대 펌웨어에서 보인 "수신 중단"도 같은 원인인지는 확인하지 못했다.
+
+**원인 (코드로 확인, 동작은 관찰로 추정):** 앵커는 하드웨어 주소 필터(`dwmac_set_frame_filter()`)를 켠다. 다른 앵커 주소로 가는 프레임(예: peer 3으로 가는 poll)은 필터가 거부하는데, 주소 필터 거부 인터럽트(`DWT_INT_ARFE_BIT_MASK`)가 꺼져 있으면 칩이 아무 이벤트 없이 수신을 멈춘다. libdeca는 수신을 다시 켜는 코드를 에러 콜백(`dwmac_irq_err_cb`, `rx_reenable`일 때 `dwt_rxenable`)에 두었는데 이 콜백이 불리지 않는다. libdeca는 ARFE를 `CONFIG_DECA_DEBUG_FRAME_FILTER` 빌드에서만 켠다(`dwmac.c`). 이 사실은 Task 6 담당(손윤기)의 3001 시험에서도 독립적으로 확인됐다 (3001에만 수정을 적용하자 peer 3 110/110 `OK`, 수정 안 한 N6 앵커 peer 1은 111회 전부 `FAIL`).
+
+**수정:** `uwb_app/uwb_app.c`의 `uwb_app_init()`에서 `dwmac_set_frame_filter()` 바로 뒤, IRQ를 켜기 전에 한 줄을 추가했다. libdeca 소스는 고치지 않았다. 태그와 앵커 빌드 모두에 들어간다.
+
+```c
+dwt_setinterrupt(DWT_INT_ARFE_BIT_MASK, 0, DWT_ENABLE_INT);
+```
+
+**보드 상태 (2026-11-17):**
+
+| 보드 | 플래시 이미지 | 크기 | SHA256 | ARFE 수정 |
+| --- | --- | --- | --- | --- |
+| 앵커 A (N6 보드 2, ST-LINK `0036…531`) | `t2_responder-trusted.bin` (`--antenna-delay 16400`) | 65,696 B | `e7455e9b14ca75b4125f2564cee725597a913fe425ecf3443dff8969cb89bfb1` | 있음 |
+| 태그 (N6 보드 1, ST-LINK `0047…531`) | `t2_initiator-trusted.bin` (`--peers 1,3 --antenna-delay 16400`) | 65,984 B | `bffff1dc2c08812e1c9f65d628252ca9e0e6cd05bb3704e70713516a728eda6e` | **없음** (수정 전 빌드) |
+
+- 쓰기 전에 두 보드 모두 외부 플래시 앞 128 KiB를 백업했다(백업 파일은 저장소에 넣지 않았고 팀원 PC가 아니라 작업 PC의 `종합설계` 폴더에 있다). 쓰기와 verify는 `Download verified successfully`로 통과했고 JP2를 1–2로 되돌린 뒤 앵커는 수신 대기 상태(`state=01170500`)로 자동 부팅한다.
+- **아직 확인하지 못한 것:** 수정이 실제로 앵커 멈춤을 없애는지(앵커 A의 `entries` 증가, 태그에서 peer 1 `OK`)는 태그와 함께 돌려 보지 않았다. 앵커의 UART 출력은 수정 전후가 같아서 부팅만으로는 구분되지 않는다. 3001(peer 3)과의 통신도 이 보드 조합에서는 시험하지 않았다.
+- 서명은 `STM32_SigningTool_CLI -s -bin <bin> -nk -of 0x80000000 -t fsbl -o <trusted> -hv 2.3 -align`, 쓰기는 `-el MX25UM51245G_STM32N6570-NUCLEO.stldr -w <trusted> 0x70000000 -v`(개발 모드 JP2 2–3, ST-LINK 번호를 명시)다. 쓴 뒤 JP2를 1–2로 되돌려야 플래시에서 부팅한다.
+
 ## 수정 과제 기준으로 남은 일
 
 1. 정확한 1.00 m, 같은 높이/방향, 안테나 기준점이 보이는 배치 사진을 준비한다.
