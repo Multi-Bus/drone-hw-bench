@@ -1,0 +1,19 @@
+{
+  "observed_rows": 30,
+  "attempt_span": 30,
+  "missing_rows": 0,
+  "successes": 0,
+  "success_rate": 0.0,
+  "mean_m": null,
+  "mean_error_m": null,
+  "sample_std_m": null,
+  "max_m": null,
+  "p95_absolute_error_m": null,
+  "max_queue_dropped": 0,
+  "rssi_available": false,
+  "complete": true,
+  "nominal_distance_m": 0.5,
+  "reference_quality": "approximate",
+  "accuracy_validated": false,
+  "note": "User clarified that the nominal 50 cm reference was approximate. Compare repeatability within each unchanged placement, not absolute accuracy or calibration."
+}

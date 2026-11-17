@@ -27,7 +27,12 @@ void dw3000_spi_speed_slow(void)
 
 void dw3000_spi_speed_fast(void)
 {
+#if defined(UWB_SPI_ENABLE_FAST) && !UWB_SPI_ENABLE_FAST
+  /* TWR bring-up stays at the board-tested 2 MHz, including libdeca's request. */
+  uwb_port_spi_slow();
+#else
   uwb_port_spi_fast();
+#endif
 }
 
 int32_t dw3000_spi_read(uint16_t headerLength, uint8_t *headerBuffer, uint16_t readLength, uint8_t *readBuffer)

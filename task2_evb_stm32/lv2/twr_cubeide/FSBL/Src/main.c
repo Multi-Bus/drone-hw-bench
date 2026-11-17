@@ -24,6 +24,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "uwb_port.h"
+#include "uwb_runner.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -121,124 +122,7 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-
-  /* Task 2 Lv2: DWM3000EVB Device ID test (hardware reset + SPI read of DEV_ID, 20 times) */
-  SystemCoreClockUpdate();
-  printf("\r\n== T2 Lv2: DWM3000EVB Device ID test ==\r\n");
-  printf("SPI5 mode 0, CS=PA3 (D10), RSTn=PE11 (D7), IRQ=PD12 (D8)\r\n");
-  if (uwb_port_init() != UWB_OK)
-  {
-    printf("uwb_port_init FAILED\r\n");
-    Error_Handler();
-  }
-  printf("SPI clock = %lu Hz, IRQ level = %d\r\n", (unsigned long)uwb_port_spi_hz(), uwb_port_irq_level());
-
-  uint32_t total = 0, recognised = 0, family = 0, spi_err = 0, first_id = 0;
-  for (uint32_t n = 1; n <= 20; n++)
-  {
-    uint32_t id = 0;
-    uint8_t raw[4] = {0};
-    total++;
-    uwb_port_reset();
-    if (uwb_port_read_dev_id(&id, raw) != UWB_OK)
-    {
-      spi_err++;
-      printf("#%02lu SPI ERROR\r\n", (unsigned long)n);
-      continue;
-    }
-    const char *verdict;
-    if (id == 0xDECA0302UL || id == 0xDECA0312UL)
-    {
-      verdict = "OK (C0 silicon)";
-      recognised++;
-      family++;
-    }
-    else if ((id >> 8) == 0xDECA03UL)
-    {
-      verdict = "DW3000 family, other revision";
-      family++;
-    }
-    else if (id == 0x00000000UL)
-    {
-      verdict = "NO RESPONSE (all 0: no power, CS or wiring?)";
-    }
-    else if (id == 0xFFFFFFFFUL)
-    {
-      verdict = "NO RESPONSE (all 1: MISO floating, no device?)";
-    }
-    else
-    {
-      verdict = "UNEXPECTED";
-    }
-    if (n == 1U)
-    {
-      first_id = id;
-    }
-    printf("#%02lu id=0x%08lX raw=%02X %02X %02X %02X (RIDTAG %04lX MODEL %02lX VER %lX REV %lX) IRQ=%d  %s\r\n",
-           (unsigned long)n, (unsigned long)id,
-           (unsigned)raw[0], (unsigned)raw[1], (unsigned)raw[2], (unsigned)raw[3],
-           (unsigned long)(id >> 16), (unsigned long)((id >> 8) & 0xFFU),
-           (unsigned long)((id >> 4) & 0xFU), (unsigned long)(id & 0xFU),
-           uwb_port_irq_level(), verdict);
-    HAL_Delay(200);
-  }
-
-  /* 10 more reads without a reset: the value must not change */
-  uint32_t same = 0, reads = 10;
-  for (uint32_t n = 0; n < reads; n++)
-  {
-    uint32_t id = 0;
-    uint8_t raw[4] = {0};
-    if (uwb_port_read_dev_id(&id, raw) == UWB_OK && id == first_id)
-    {
-      same++;
-    }
-  }
-  printf("\r\nresult: reset+read %lu/%lu recognised (0xDECA0302 / 0xDECA0312), %lu/%lu DW3000 family, %lu SPI errors\r\n",
-         (unsigned long)recognised, (unsigned long)total, (unsigned long)family, (unsigned long)total, (unsigned long)spi_err);
-  printf("        read again without reset: %lu/%lu equal to the first value 0x%08lX\r\n",
-         (unsigned long)same, (unsigned long)reads, (unsigned long)first_id);
-  printf("verdict: %s\r\n", (family == total && same == reads) ? "PASS" : "FAIL");
-
-  /* MOSI test: DEV_ID read with an extended header (contains a 1 bit) and write/read-back of PANADR
-     (harmless register, original value restored). Repeated after a reset, 20 rounds. */
-  printf("\r\n== MOSI test: PANADR write/read-back, 20 rounds (each after a reset) ==\r\n");
-  uint32_t mosi_rounds = 20, mosi_pass = 0, mosi_err = 0;
-  for (uint32_t n = 1; n <= mosi_rounds; n++)
-  {
-    uwb_mosi_result_t r;
-    uwb_port_reset();
-    if (uwb_port_mosi_selftest(&r) != UWB_OK)
-    {
-      mosi_err++;
-      printf("#%02lu SPI ERROR\r\n", (unsigned long)n);
-      continue;
-    }
-    int eam_ok = (r.eam_dev_id == first_id);
-    int restored_ok = (r.restored_value == r.panadr_orig);
-    int ok = eam_ok && (r.mismatches == 0U) && restored_ok;
-    if (ok)
-    {
-      mosi_pass++;
-    }
-    printf("#%02lu eam_id=0x%08lX(%s) PANADR_orig=0x%08lX mismatch=%lu/%u stuck_low=0x%08lX stuck_high=0x%08lX restored=%s  %s\r\n",
-           (unsigned long)n, (unsigned long)r.eam_dev_id, eam_ok ? "ok" : "NG", (unsigned long)r.panadr_orig,
-           (unsigned long)r.mismatches, (unsigned)UWB_MOSI_PATTERNS,
-           (unsigned long)r.stuck_low_bits, (unsigned long)r.stuck_high_bits,
-           restored_ok ? "ok" : "NG", ok ? "OK" : "FAIL");
-    if (n == 1U)
-    {
-      for (uint32_t i = 0; i < UWB_MOSI_PATTERNS; i++)
-      {
-        printf("      write 0x%08lX -> read 0x%08lX\r\n", (unsigned long)r.written[i], (unsigned long)r.readback[i]);
-      }
-    }
-    HAL_Delay(100);
-  }
-  printf("MOSI result: %lu/%lu rounds OK, %lu SPI errors\r\n",
-         (unsigned long)mosi_pass, (unsigned long)mosi_rounds, (unsigned long)mosi_err);
-  printf("MOSI verdict: %s\r\n", (mosi_pass == mosi_rounds) ? "PASS" : "FAIL");
-  printf("== done ==\r\n");
+  uwb_runner_init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -248,6 +132,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    uwb_runner_poll();
 
   }
   /* USER CODE END 3 */

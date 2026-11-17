@@ -1,0 +1,22 @@
+[
+  {
+    "role": "initiator",
+    "file": "t2_initiator-trusted.bin",
+    "sha256": "6A4F026E049070A2D0C3C6AC9ECF34FCD7F8B71213E496FE79175F6CD4D1DB98",
+    "bytes": 65792,
+    "address": "0x70000000",
+    "write_verify": "PASS",
+    "antenna_delay": 16400,
+    "cold_boot": "PASS: user power cycle, JP1/JP2 1-2, UART TWR on both ports without download/go"
+  },
+  {
+    "role": "responder",
+    "file": "t2_responder-trusted.bin",
+    "sha256": "9076DA77ABCE5DD500CB104588E44C0570B628E9DEB40701EFDDC2E4D426039D",
+    "bytes": 65600,
+    "address": "0x70000000",
+    "write_verify": "PASS",
+    "antenna_delay": 16400,
+    "cold_boot": "PASS: user power cycle, JP1/JP2 1-2, UART TWR on both ports without download/go"
+  }
+]

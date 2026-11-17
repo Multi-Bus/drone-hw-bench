@@ -1,0 +1,16 @@
+{
+  "board1": {
+    "stlink_serial": "004700233335511035383531",
+    "com_port": "COM12",
+    "model": "NUCLEO-N657X0-Q",
+    "confirmed_by": "user connected board 1 alone to CN10",
+    "date": "2026-11-17"
+  },
+  "board2": {
+    "stlink_serial": "0036004D3335510735383531",
+    "com_port": "COM13",
+    "model": "NUCLEO-N657X0-Q",
+    "confirmed_by": "second board connected after board 1",
+    "date": "2026-11-17"
+  }
+}

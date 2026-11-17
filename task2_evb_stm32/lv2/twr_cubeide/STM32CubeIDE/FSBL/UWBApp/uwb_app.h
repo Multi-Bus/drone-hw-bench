@@ -15,7 +15,8 @@ bool uwb_app_init(uint16_t my_address, bool responder);
 /* Start one double-sided TWR exchange. For initiator only. */
 bool uwb_app_start_ds_twr(uint16_t peer_address);
 
-/* Read the most recent completed measurement outside IRQ context. */
+/* Read a completed exchange outside IRQ context. distance_cm == UINT16_MAX
+ * is a failed exchange; do not treat it as a range measurement. */
 bool uwb_app_take_result(uwb_range_result_t *result);
 
 #endif
