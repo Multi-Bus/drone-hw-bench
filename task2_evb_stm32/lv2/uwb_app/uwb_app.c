@@ -80,6 +80,14 @@ bool uwb_app_init(uint16_t my_address, bool responder)
         return false;
     }
     dwmac_set_frame_filter();
+    /* The hardware address filter drops frames addressed to another device (for
+     * example a poll to a second anchor). Without the filter-error interrupt (ARFE)
+     * the chip then goes idle and raises no event at all, so the receiver is never
+     * re-armed and an anchor stops answering for good after overhearing one such
+     * frame. With ARFE enabled libdeca's error callback re-arms RX
+     * (dwmac_set_rx_reenable). libdeca enables this bit only in a "debug" build
+     * (CONFIG_DECA_DEBUG_FRAME_FILTER), so enable it explicitly. */
+    dwt_setinterrupt(DWT_INT_ARFE_BIT_MASK, 0, DWT_ENABLE_INT);
     twr_init(UWB_PROCESSING_DELAY_US, true);
     twr_set_observer(twr_done_callback);
 
