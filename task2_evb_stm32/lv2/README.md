@@ -105,6 +105,20 @@ python task2_evb_stm32/lv2/tools/log_twr.py --port COM12 --samples 300 --distanc
 
 `tools/uart_command.py --port COM12 s`로 initiator를 멈추고, `--port COM12 r`로 재개한다. responder(COM13)의 `r`은 RX를 다시 시작한다. 멈춘 상태에서 `a16400` 같은 명령으로 각 포트의 TX/RX 지연을 바꿀 수 있다. 일치하는 ACK를 확인해야 적용된 것이다. **UART 설정은 RAM에만 남으므로 전원 후 유지하려면 해당 값으로 다시 빌드/저장해야 한다.**
 
+## 앵커 두 개에 번갈아 묻는 모드 (`--peers`, Task 2 + Task 6 동시 측정)
+
+요청서 `N6_태그_수정요청.md`(2026-11-17, Task 6 → Task 2. 저장소에는 없다)에 따라 추가했다. 태그(N6 보드 1, 주소 2)가 상대 목록을 시도마다 번갈아 묻는다. 한 시도가 끝난 뒤 다음 상대로 넘어가므로 한 번에 한 쌍만 통신한다.
+
+- 빌드(태그만): `build_firmware.py ... --role initiator --antenna-delay 16400 --peers 1,3`. `--peers`를 주지 않으면 지금까지의 단일 상대(주소 1) 펌웨어와 **같은 출력**(7열, 시작 줄 `peer=1`)이고, 응답자 빌드에는 쓸 수 없다(오류). 주소 2(태그 자신)와 중복 주소도 거부한다. manifest의 `peers`에 기록된다.
+- 출력(`--peers`를 준 태그): 시작 줄 `# T2 LIBDECA DS-TWR role=initiator address=2 peers=1,3 ant=16400`, 머리말 `# TWR,tick_ms,attempt,sequence,peer,distance_cm,status,queue_dropped`. `attempt`는 전체 시도 번호이고 시도 n은 `peers[(n-1) % 개수]`에게 묻는다. TIMEOUT 줄에도 그 시도의 `peer`가 들어간다.
+- 로거: 8열과 기존 7열을 모두 읽는다. CSV에 `peer` 열이 추가된다(7열 입력은 비어 있음). `--samples`는 **상대마다** 센 개수이고, `.summary.json`은 `peers` 아래 상대별로 시도, 성공, 성공률, 누락, 평균, 표본 표준편차, 최대, `queue_dropped`를 낸다. 시도 번호는 전체에서 연속이어야 하고, 번호가 빠지면 그 차례였던 상대의 누락으로 센다. 상대 순서는 입력에서 추론하며, 한 상대가 아예 응답하지 않을 수 있으면 `--peers 1,3`으로 알려 준다.
+
+```powershell
+python task2_evb_stm32/lv2/tools/log_twr.py --port <태그 COM> --samples 300 --distance 1.0 --condition mixed_1m --peers 1,3 --ant-initiator 16400 --ant-responder 1=16400,3=16368 --out '<새 데이터 폴더>/mixed_1m.csv'
+```
+
+- 검증 상태: 로거는 단위 테스트(`tools/test_log_twr.py`)와 가짜 8열 입력으로 확인했고, 기존 7열 로그(`50cm-baseline.raw.txt`)로 다시 돌려 커밋된 요약과 같은 값이 나온다. 펌웨어는 `--peers 1,3`, 단일 상대, 응답자 세 가지를 모두 빌드했고(경고 없음), 단일 상대 빌드는 기준 커밋 `6689219`와 출력 문자열과 코드 크기가 같다. **보드에서의 실행(번갈아 묻기, 3001과의 통신)은 아직 시험하지 않았다.**
+
 ## 수정 과제 기준으로 남은 일
 
 1. 정확한 1.00 m, 같은 높이/방향, 안테나 기준점이 보이는 배치 사진을 준비한다.

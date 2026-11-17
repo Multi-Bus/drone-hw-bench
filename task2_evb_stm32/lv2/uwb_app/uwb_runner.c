@@ -18,8 +18,24 @@
 #define UWB_ANTENNA_DELAY 16368
 #endif
 
+/* Multi-peer initiator (build_firmware.py --peers 1,3 -> -DUWB_PEERS=1,3):
+ * attempts alternate over the peer list (attempt n asks peers[(n-1) % count]) and
+ * result lines carry a peer column. Without UWB_PEERS the build and its output are
+ * the unchanged single-peer format (peer 1, 7 columns). Initiator only. */
+#ifdef UWB_PEERS
+#if UWB_RESPONDER
+#error "UWB_PEERS applies to the initiator only"
+#endif
+static const uint16_t peer_list[] = { UWB_PEERS };
+#define PEER_COUNT (sizeof(peer_list) / sizeof(peer_list[0]))
+#else
+static const uint16_t peer_list[] = { 1u };
+#define PEER_COUNT 1u
+#endif
+
 extern UART_HandleTypeDef huart1;
 static uint32_t attempt, started_ms, last_ms, last_diag;
+static uint16_t current_peer = 1u; /* peer of the attempt in flight (or the last one) */
 static bool pending, running = true;
 static char command[16];
 static unsigned command_length;
@@ -27,9 +43,15 @@ static unsigned command_length;
 static void emit_result(uint16_t sequence, uint16_t cm, const char *status)
 {
     /* Empty diagnostics mean unavailable, not a zero RSSI measurement. */
+#ifdef UWB_PEERS
+    printf("TWR,%lu,%lu,%u,%u,%u,%s,%lu\r\n", (unsigned long)HAL_GetTick(),
+           (unsigned long)attempt, (unsigned)sequence, (unsigned)current_peer,
+           (unsigned)cm, status, (unsigned long)uwb_task_dropped());
+#else
     printf("TWR,%lu,%lu,%u,%u,%s,%lu\r\n", (unsigned long)HAL_GetTick(),
            (unsigned long)attempt, (unsigned)sequence, (unsigned)cm, status,
            (unsigned long)uwb_task_dropped());
+#endif
 }
 
 static void receive_command(void)
@@ -72,9 +94,17 @@ static void receive_command(void)
 void uwb_runner_init(void)
 {
     SystemCoreClockUpdate();
+#ifdef UWB_PEERS
+    printf("\r\n# T2 LIBDECA DS-TWR role=initiator address=2 peers=");
+    for (unsigned i = 0; i < PEER_COUNT; i++) {
+        printf(i ? ",%u" : "%u", (unsigned)peer_list[i]);
+    }
+    printf(" ant=%u\r\n", (unsigned)UWB_ANTENNA_DELAY);
+#else
     printf("\r\n# T2 LIBDECA DS-TWR role=%s address=%u peer=%u ant=%u\r\n",
            UWB_RESPONDER ? "responder" : "initiator", UWB_RESPONDER ? 1u : 2u,
            UWB_RESPONDER ? 2u : 1u, (unsigned)UWB_ANTENNA_DELAY);
+#endif
     if (!uwb_app_init(UWB_RESPONDER ? 1u : 2u, UWB_RESPONDER != 0)) {
         printf("# INIT_FAIL\r\n");
         Error_Handler();
@@ -82,7 +112,11 @@ void uwb_runner_init(void)
     printf("# READY id=%08lX spi_hz=%lu cpu_hz=%lu\r\n",
            (unsigned long)dwt_readdevid(), (unsigned long)uwb_port_spi_hz(),
            (unsigned long)SystemCoreClock);
+#ifdef UWB_PEERS
+    printf("# TWR,tick_ms,attempt,sequence,peer,distance_cm,status,queue_dropped\r\n");
+#else
     printf("# TWR,tick_ms,attempt,sequence,distance_cm,status,queue_dropped\r\n");
+#endif
     last_ms = HAL_GetTick();
     last_diag = last_ms;
 }
@@ -111,10 +145,11 @@ void uwb_runner_poll(void)
         last_ms = now;
         started_ms = now;
         ++attempt;
+        current_peer = peer_list[(attempt - 1u) % PEER_COUNT];
         pending = true;
         /* libdeca can return false after starting its retry path; allow that
          * path to finish and report its callback or our bounded timeout. */
-        (void)uwb_app_start_ds_twr(1u);
+        (void)uwb_app_start_ds_twr(current_peer);
     }
     if (uwb_task_dropped() != 0u || dw3000_hw_stats.loop_limit_hits != 0u) {
         printf("# FATAL queue_dropped=%lu irq_limit=%lu\r\n",

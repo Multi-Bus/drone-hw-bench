@@ -17,10 +17,25 @@ def main():
     p.add_argument('--role', choices=('initiator', 'responder', 'isr'), required=True)
     p.add_argument('--antenna-delay', type=int, default=16368)
     p.add_argument('--fast', action='store_true', help='Opt into unvalidated 8 MHz')
+    p.add_argument('--peers', help='Initiator only: comma-separated responder addresses asked in '
+                   'turn (e.g. 1,3). Output gains a peer column. Without it the build is the '
+                   'unchanged single-peer (address 1) firmware.')
     p.add_argument('--out', type=Path)
     a = p.parse_args()
     if not 0 <= a.antenna_delay <= 65535:
         p.error('antenna delay must be 0..65535')
+    peers = None
+    if a.peers is not None:
+        if a.role != 'initiator':
+            p.error('--peers applies to --role initiator only')
+        try:
+            peers = [int(v) for v in a.peers.split(',')]
+        except ValueError:
+            p.error('--peers must be comma-separated integers, e.g. 1,3')
+        if not peers or len(set(peers)) != len(peers) or any(not 1 <= v <= 65534 for v in peers):
+            p.error('--peers needs unique addresses in 1..65534')
+        if 2 in peers:
+            p.error('address 2 is the initiator itself')
     lv2 = Path(__file__).resolve().parents[1]
     bench = lv2.parents[1]
     out = (a.out or bench / 'build' / ('t2_' + a.role)).resolve()
@@ -58,6 +73,8 @@ def main():
                    f'-DUWB_RESPONDER={int(a.role == "responder")}',
                    f'-DUWB_ANTENNA_DELAY={a.antenna_delay}',
                    f'-DUWB_SPI_ENABLE_FAST={int(a.fast)}']
+    if peers:
+        flags.append('-DUWB_PEERS=' + ','.join(map(str, peers)))
     flags += ['-I' + str(d) for d in includes]
     sources = [fsbl / 'Src' / name for name in
                ('main.c', 'stm32n6xx_hal_msp.c', 'stm32n6xx_it.c', 'system_stm32n6xx_fsbl.c')]
@@ -98,7 +115,7 @@ def main():
              *objects, '-Wl,--start-group', '-lc', '-lm', '-Wl,--end-group', '-o', elf])
         run([a.tool_bin / 'arm-none-eabi-objcopy.exe', '-O', 'binary', elf, elf.with_suffix('.bin')])
         run([a.tool_bin / 'arm-none-eabi-size.exe', elf])
-    manifest = {'role': a.role, 'antenna_delay': a.antenna_delay,
+    manifest = {'role': a.role, 'antenna_delay': a.antenna_delay, 'peers': peers,
                 'spi_hz': 8000000 if a.fast else 2000000,
                 'elf_sha256': hashlib.sha256(elf.read_bytes()).hexdigest(),
                 'dependencies': {key: sha for key, (_, sha) in expected.items()},
