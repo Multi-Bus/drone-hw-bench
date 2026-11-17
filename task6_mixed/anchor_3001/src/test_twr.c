@@ -1,5 +1,5 @@
 /* Task 6 Lv1 step B: libdeca DS-TWR on DWM3001CDK.
- * Same settings as the Task 2 tag (task2_evb_stm32/lv2/uwb_app/uwb_app.c): PAN 0xDECA, processing delay 2000 us,
+ * Same settings as the Task 2 tag (task2_evb_stm32/lv2/uwb_app/uwb_app.c): PAN 0xDECA, processing delay 5000 us (Task 2 6689219),
  * send_report on, responder 0x0001 (anchor), initiator 0x0002 (tag). Build with -DT6_ROLE=responder|initiator;
  * a second anchor gets another address with -DT6_ANCHOR_ADDR=0x0003 (the tag only ranges to 0x0001).
  * Startup order follows Task 2 HANDOFF_2026-11-16: driver/libdeca init first, interrupt last.
@@ -24,7 +24,7 @@
 #include "ranging.h"
 
 #define UWB_PAN_ID              0xDECAu
-#define UWB_PROCESSING_DELAY_US 2000u
+#define UWB_PROCESSING_DELAY_US 5000u /* Task 2 tag changed 2000 -> 5000 in 6689219; both sides must match */
 #define ADDR_RESPONDER          0x0001u /* the anchor the tag ranges to (Task 2 tag: 0x0001) */
 #ifndef T6_ANCHOR_ADDR
 #define T6_ANCHOR_ADDR          ADDR_RESPONDER
@@ -61,6 +61,35 @@ static void stop(const char *why)
         __WFE();
     }
 }
+
+#if T6_SNIFF
+static uint32_t n_rx, n_err, n_to;
+
+/* runs from app_sched_execute(): print frame control, seq, PAN, dst, src (802.15.4 short addressing) */
+static void sniff_rx(const struct rxbuf *rx)
+{
+    n_rx++;
+    const uint8_t *b = rx->buf;
+    if (rx->len >= 9) {
+        P("RX len=%u fc=%02X%02X seq=%u pan=%02X%02X dst=%02X%02X src=%02X%02X b9=%02X\n", (unsigned)rx->len, b[1], b[0],
+          b[2], b[4], b[3], b[6], b[5], b[8], b[7], rx->len > 9 ? b[9] : 0);
+    } else {
+        P("RX len=%u\n", (unsigned)rx->len);
+    }
+}
+
+static void sniff_to(uint32_t status)
+{
+    n_to++;
+}
+
+static void sniff_err(uint32_t status)
+{
+    if (n_err++ < 20) {
+        P("RXERR status=0x%08X\n", (unsigned)status);
+    }
+}
+#endif
 
 /* APP_SCHED_INIT uses APP_ERROR_CHECK */
 void app_error_handler_bare(uint32_t err)
@@ -125,10 +154,26 @@ int main(void)
         stop("dwphy_config");
     }
     dwphy_set_antenna_delay(DWPHY_ANTENNA_DELAY); /* library default, not calibrated */
+#if T6_SNIFF
+    /* diagnostic: no frame filter, no replies; print every received frame and RX error */
+    if (!dwmac_init(UWB_PAN_ID, me, sniff_rx, sniff_to, sniff_err)) {
+        stop("dwmac_init");
+    }
+    P("SNIFF mode: frame filter off, not replying\n");
+#else
     if (!dwmac_init(UWB_PAN_ID, me, dwprot_rx_handler, NULL, NULL)) {
         stop("dwmac_init");
     }
     dwmac_set_frame_filter();
+#if T6_ARFE_FIX
+    /* libdeca enables the address-filter-reject interrupt (ARFE) only with CONFIG_DECA_DEBUG_FRAME_FILTER.
+     * Without it a frame for another address is rejected silently and the receiver was observed to stay off
+     * (anchor deaf once a second anchor is on air). dwt_isr() reports ARFE as an RX error, and libdeca's
+     * error callback re-enables RX (rx_reenable), so enabling the interrupt is enough. */
+    dwt_setinterrupt(DWT_INT_ARFE_BIT_MASK, 0, DWT_ENABLE_INT);
+    P("ARFE interrupt on (re-enable RX after address filter reject)\n");
+#endif
+#endif
     twr_init(UWB_PROCESSING_DELAY_US, true);
     twr_set_observer(twr_done);
 
@@ -169,6 +214,15 @@ int main(void)
             P("STAT,t=%u s,start=%u,ok=%u,fail=%u,busy=%u,irq_loop_limit=%u\n", (unsigned)(now / 1000u),
               (unsigned)n_start, (unsigned)n_ok, (unsigned)n_fail, (unsigned)n_busy,
               (unsigned)dw3000_hw_loop_limit_hits());
+            {
+                dwt_deviceentcnts_t c;
+                dwt_readeventcounters(&c);
+                P("EVC,crc_good=%u,arfe=%u,phe=%u,sfdto=%u,tx=%u\n", (unsigned)c.CRCG, (unsigned)c.ARFE,
+                  (unsigned)c.PHE, (unsigned)c.SFDTO, (unsigned)c.TXF);
+            }
+#if T6_SNIFF
+            P("SNIFF,rx=%u,rxerr=%u,rxto=%u\n", (unsigned)n_rx, (unsigned)n_err, (unsigned)n_to);
+#endif
         }
     }
 }

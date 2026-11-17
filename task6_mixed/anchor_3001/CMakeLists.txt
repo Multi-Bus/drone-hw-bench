@@ -18,6 +18,8 @@ endif()
 set(T6_TEST "twr" CACHE STRING "devid | fast_irq | twr")
 set(T6_ROLE "responder" CACHE STRING "twr only: responder (anchor) | initiator (tag 0x0002)")
 set(T6_ANCHOR_ADDR "0x0001" CACHE STRING "twr responder only: anchor address (0x0001, 0x0003, ...)")
+set(T6_ARFE_FIX "1" CACHE STRING "twr: 1 = enable ARFE interrupt so RX restarts after address filter reject")
+set(T6_SNIFF "0" CACHE STRING "twr responder only: 1 = diagnostic receiver (no frame filter, no replies)")
 add_executable(anchor_3001.elf
   src/test_${T6_TEST}.c
   src/log.c
@@ -59,9 +61,9 @@ if(T6_TEST STREQUAL "twr")
     ${NRF5_SDK}/components/libraries/scheduler/app_scheduler.c)
   target_include_directories(anchor_3001.elf PRIVATE ${LD} ${NRF5_SDK}/components/libraries/scheduler)
   if(T6_ROLE STREQUAL "initiator")
-    target_compile_definitions(anchor_3001.elf PRIVATE T6_ROLE_INITIATOR=1)
+    target_compile_definitions(anchor_3001.elf PRIVATE T6_ROLE_INITIATOR=1 T6_ARFE_FIX=${T6_ARFE_FIX})
   else()
-    target_compile_definitions(anchor_3001.elf PRIVATE T6_ROLE_INITIATOR=0 T6_ANCHOR_ADDR=${T6_ANCHOR_ADDR})
+    target_compile_definitions(anchor_3001.elf PRIVATE T6_ROLE_INITIATOR=0 T6_ANCHOR_ADDR=${T6_ANCHOR_ADDR} T6_SNIFF=${T6_SNIFF} T6_ARFE_FIX=${T6_ARFE_FIX})
   endif()
 endif()
 

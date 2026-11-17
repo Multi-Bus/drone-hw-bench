@@ -132,11 +132,42 @@ br101 `platform/nrf-sdk/dw3000_hw.c`의 `dw3000_hw_interrupt_enable/disable/is_e
 
 libdeca는 런타임 설정(`dwphy_set_antenna_delay()` → `dwt_settx/rxantennadelay`)과 별개로, 메시지에 넣는 송신 시각에 **컴파일 상수** `DWPHY_ANTENNA_DELAY`(`dwphy.h`, 16368)를 더한다 (`ranging.c:170, 206`, `sync.c`). 그래서 보드마다 다른 보정값을 쓰려면 런타임 값만 바꿔서는 안 되고 이 상수도 맞춰야 한다. libdeca를 고치거나 빌드 정의로 바꾸는 방법은 Task 2 태그와 같이 정해야 해서 아직 하지 않았다.
 
-## 현재 보드 상태 (2026-11-16, 3001↔3000 시험 대기)
+## 현재 보드 상태 (2026-11-17, 3001↔3000 시험 대기)
+
+Task 2 `6689219`에서 N6 쪽 처리 지연이 2000 → **5000 µs**로 바뀌어 3001도 5000으로 맞췄다 (`src/test_twr.c`). 다시 올린 뒤 두 보드 모두 RTT에 `TWR: delay 5192 us RX delay 5078 us`와 `listening`이 나왔다.
 
 | 보드 (J-Link) | 펌웨어 | 빌드 |
 | --- | --- | --- |
 | `760226397` | `twr` responder, 앵커 **`0x0001`** | `-B build_anchor -DT6_ROLE=responder` |
 | `760226502` | `twr` responder, 앵커 **`0x0003`** | `-B build_anchor3 -DT6_ROLE=responder -DT6_ANCHOR_ADDR=0x0003` |
 
-두 보드 모두 시작 후 `listening`과 MAC 주소를 RTT로 출력하는 것을 확인했다. Task 2 태그(N6, `0x0002`)는 `0x0001`에만 거리를 묻는다 (`uwb_app_start_ds_twr(0x0001)`). 두 앵커가 같은 주소면 둘 다 응답해 충돌하므로 두 번째 앵커는 `0x0003`으로 했다. 3001끼리 시험하려면 한 보드를 `initiator`로 다시 올린다.
+3000↔3000과 3000↔3001 동시 측정에서는 N6 보드 2가 주소 1을 쓰므로 `760226397`(`0x0001`)은 끈다. 3001끼리 시험하려면 한 보드를 `initiator`로 다시 올린다 (처리 지연 5000 µs로는 3001끼리 시험하지 않았다).
+
+## 결과 4: 3000(N6 태그) ↔ 3001 앵커 첫 연결 (2026-11-17)
+
+구성: N6 보드 1 = 태그 (Task 2 새 펌웨어, 시작 줄 `role=initiator address=2 peers=1,3 ant=16400`, 출력 8열), N6 보드 2 = 앵커 1, 3001 `760226502` = 앵커 3. 배치 거리는 재지 않았다.
+
+| 단계 | peer 1 (N6 앵커) | peer 3 (3001 앵커) |
+| --- | --- | --- |
+| 처음 | 전부 FAIL, N6 보드 2 HEALTH `entries` 4에서 멈춤 | 전부 FAIL, 3001 수신 기록 없음 |
+| 3001 수신 전용 감시 모드 (`-DT6_SNIFF=1`: 필터 끔, 응답 안 함) | | 12초에 태그 프레임 311개 (PAN `DECA`, src `0002`, dst `0001`/`0003` 번갈아, 수신 오류 0). 태그 송신과 PHY는 정상 |
+| 3001에 ARFE 인터럽트 추가 (`T6_ARFE_FIX=1`) | 111회 전부 FAIL (N6는 그대로) | **110/110 OK** (출력 100~193 cm). 15초 재확인 76/76 OK |
+
+원본: `logs/t6_lv1_mixed_sniff_jlink760226502.txt`, `logs/t6_lv1_mixed_arfe_fix_anchor3_jlink760226502.txt`, `logs/t6_lv1_mixed_arfe_fix_tag_n6board1.txt` (태그 UART 15초).
+
+**원인:** libdeca `dwmac_init()`은 주소 필터 거부(ARFE) 인터럽트를 `CONFIG_DECA_DEBUG_FRAME_FILTER`일 때만 켠다. 앵커가 둘 이상이면 각 앵커가 다른 앵커 주소로 가는 프레임을 듣고 필터가 거부하는데, 알림이 없어 수신기가 다시 켜지지 않는다 (관찰로 추정, DW3000 데이터시트로는 확인 못 함). `dwt_isr()`가 ARFE를 수신 오류로 처리하고 libdeca 오류 콜백이 `rx_reenable`이면 수신을 다시 켜므로, 앱에서 `dwt_setinterrupt(DWT_INT_ARFE_BIT_MASK, 0, DWT_ENABLE_INT)`만 추가했다 (libdeca 소스는 그대로). N6 쪽에도 같은 수정이 필요하다.
+
+- 거리 값은 보정 전이다 (3001 16368, N6 16400, libdeca 상수 16368). 배치도 재지 않았다.
+- `STAT` 줄 다음에 이벤트 카운터(`EVC,crc_good,arfe,phe,sfdto,tx`)를 출력하도록 추가했다.
+
+## 결과 5: N6 앵커 수정 후 두 쌍 동시 확인 (2026-11-17)
+
+Task 2 쪽이 태그 `--peers 1,3`(원격 `task6` 브랜치 `c79da61`, `d49ff20`, stevechung7)과 N6 앵커의 ARFE 수정을 보드에 올린 뒤 확인했다. 배치 거리는 재지 않았다 (두 앵커를 나란히 두지도 않음).
+
+| 확인 | 결과 |
+| --- | --- |
+| 20초 그대로 | peer 1 **100/100 OK**, peer 3 **100/100 OK**. N6 앵커 HEALTH `entries`가 계속 늘어남 (1032 → 1634) |
+| 3001 CPU를 J-Link로 멈춤 (6초) | peer 3만 FAIL 30, peer 1은 OK 30. 다시 돌리자 바로 둘 다 OK (31 / 30) |
+| 로거 (`log_twr.py --peers 1,3 --samples 50`) | 상대별 요약 생성, 둘 다 50/50, 누락 0, `queue_dropped` 0 |
+
+원본: `logs/t6_lv1_mixed_check_peers.csv`, `.raw.txt`, `.summary.json`. 평균 출력은 peer 1 0.22 m, peer 3 1.27 m인데 두 앵커가 나란히 있지 않았고 보정 전이라 비교하지 않는다.
