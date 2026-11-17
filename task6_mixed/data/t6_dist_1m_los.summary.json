@@ -1,0 +1,38 @@
+{
+  "observed_rows": 1000,
+  "max_queue_dropped": 0,
+  "peers": {
+    "1": {
+      "observed_rows": 500,
+      "attempt_span": 500,
+      "missing_rows": 0,
+      "successes": 500,
+      "success_rate": 1.0,
+      "mean_m": 0.85408,
+      "mean_error_m": -0.14592000000000005,
+      "sample_std_m": 0.02651716274113201,
+      "max_m": 0.93,
+      "p95_absolute_error_m": 0.18999999999999995,
+      "max_queue_dropped": 0,
+      "rssi_available": false
+    },
+    "3": {
+      "observed_rows": 500,
+      "attempt_span": 500,
+      "missing_rows": 0,
+      "successes": 500,
+      "success_rate": 1.0,
+      "mean_m": 0.95928,
+      "mean_error_m": -0.04071999999999998,
+      "sample_std_m": 0.022182554664937168,
+      "max_m": 1.05,
+      "p95_absolute_error_m": 0.07999999999999996,
+      "max_queue_dropped": 0,
+      "rssi_available": false
+    }
+  },
+  "complete": true,
+  "nominal_distance_m": 1.0,
+  "reference_quality": "measured",
+  "accuracy_validated": false
+}
