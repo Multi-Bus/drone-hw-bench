@@ -1,5 +1,7 @@
 # Task 6 앵커: DWM3001CDK 펌웨어 (br101 드라이버 v08.02.02)
 
+2026-11-22에 진행한 N6 태그와 DWM3001CDK 앵커의 3 m DS-TWR 시험은 [Qorvo 1대1 기록](qorvo_1to1/README.md)에 있다. 이 시험에서 DWM3001CDK는 initiator, STM32N6 태그는 responder로 동작했다.
+
 3001(nRF52833 + DW3110)에 Task 2 태그(STM32N6 + DWM3000EVB)와 **같은 드라이버**를 올리는 프로젝트다. 나중에 같은 libdeca를 올려 3001↔3000이 같은 프로토콜로 거리를 재게 한다.
 
 시험 프로그램은 CMake 옵션 `T6_TEST`로 고른다.
