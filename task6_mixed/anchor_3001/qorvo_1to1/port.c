@@ -4,6 +4,10 @@
 #include "dw3000/dw3000_deca_regs.h"
 #include "port.h"
 
+#ifndef CDK_POWER_INDEX
+#define CDK_POWER_INDEX 27
+#endif
+
 /* DWM3001CDK wiring verified by the team's Task 6 port. */
 enum { SCK = 3, MOSI = 8, MISO = 29, RESET = 25, CS = 6 };
 
@@ -47,6 +51,13 @@ static uint32_t timer_us(void)
     TIMER2(0x040) = 1; /* CAPTURE[0] */
     return TIMER2(0x540); /* CC[0] */
 }
+
+#ifdef UWB3_ANCHOR_ID
+uint32_t cdk_time_us(void)
+{
+    return timer_us();
+}
+#endif
 
 static void delay_us(uint32_t us)
 {
@@ -217,7 +228,7 @@ void __real_dwt_configuretxrf(dwt_txconfig_t *config);
 void __wrap_dwt_configuretxrf(dwt_txconfig_t *config)
 {
     /* Channel-5 reference-frame power index recorded on a CDK in the team's Task 1 LISTCAL. */
-    power_indexes_t indexes = { .input = { 0x1B, 0x1B, 0x1B, 0x1B } };
+    power_indexes_t indexes = { .input = { CDK_POWER_INDEX, CDK_POWER_INDEX, CDK_POWER_INDEX, CDK_POWER_INDEX } };
     tx_adj_res_t result = { 0 };
     if (dwt_calculate_linear_tx_power(5, &indexes, &result) != DWT_SUCCESS) {
         test_run_info((unsigned char *)"TX POWER CONVERSION FAILED");
@@ -259,6 +270,9 @@ void __wrap_waitforsysstatus(uint32_t *low, uint32_t *high,
 }
 
 extern int ds_twr_initiator(void);
+#ifdef UWB3_ANCHOR_ID
+extern void uwb3_anchor(void);
+#endif
 extern uint32_t __bss_start, __bss_end;
 
 __attribute__((used, noreturn)) void cdk_init(void)
@@ -278,7 +292,11 @@ __attribute__((used, noreturn)) void cdk_init(void)
                           ((uint32_t)id[2] << 16) | ((uint32_t)id[3] << 24);
     }
 
+#ifdef UWB3_ANCHOR_ID
+    uwb3_anchor();
+#else
     ds_twr_initiator();
+#endif
     for (;;) { }
 }
 
